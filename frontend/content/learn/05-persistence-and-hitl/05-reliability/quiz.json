@@ -1,0 +1,57 @@
+[
+  {
+    "q": "다음 중 RetryPolicy로 재시도하기에 가장 적합한 오류는?",
+    "options": [
+      "프롬프트 템플릿의 KeyError (코드 버그)",
+      "LLM 제공자의 503 Service Unavailable",
+      "401 인증 실패",
+      "사용자가 입력한 잘못된 날짜 형식으로 인한 ValueError"
+    ],
+    "answer": 1,
+    "explain": "503, 429, 네트워크 끊김 같은 일시적 오류는 잠시 후 다시 시도하면 성공할 가능성이 높습니다. 버그·인증 실패·잘못된 입력은 재시도해도 같은 결과입니다."
+  },
+  {
+    "q": "add_node(..., retry_policy=RetryPolicy(max_attempts=3), error_handler=fallback)인 노드가 계속 재시도 대상 예외를 던지면?",
+    "options": [
+      "첫 실패 즉시 fallback이 호출된다",
+      "3번 시도한 뒤 fallback(state, NodeError)이 호출되고, 그 반환값으로 실행이 계속된다",
+      "fallback은 무시되고 무한히 재시도한다",
+      "fallback이 호출된 뒤 노드가 다시 3번 재시도된다"
+    ],
+    "answer": 1,
+    "explain": "error_handler는 재시도를 모두 소진한 '최종 실패' 시점에 NodeError(node, error)를 주입받아 호출됩니다."
+  },
+  {
+    "q": "CachePolicy의 key_func를 설계할 때 가장 위험한 실수는?",
+    "options": [
+      "질문 문자열을 소문자로 정규화하는 것",
+      "결과가 사용자마다 달라지는데 user_id를 키에서 빼는 것",
+      "ttl을 지정하는 것",
+      "요청마다 달라지는 request_id를 키에서 빼는 것"
+    ],
+    "answer": 1,
+    "explain": "결과에 영향을 주는 필드를 빼면 다른 사용자의 결과가 캐시에서 나갈 수 있습니다. 반대로 request_id처럼 결과와 무관하게 매번 달라지는 필드는 빼야 캐시가 맞습니다."
+  },
+  {
+    "q": "LangGraph 노드의 timeout 인자에 대한 설명으로 옳은 것은?",
+    "options": [
+      "동기 노드의 time.sleep도 즉시 중단시킨다",
+      "asyncio 취소를 이용하므로 async 노드에서 동작하며, 초과 시 NodeTimeoutError가 발생한다",
+      "그래프 전체 실행 시간 제한이다",
+      "timeout이 있으면 HTTP 클라이언트 timeout은 설정할 필요가 없다"
+    ],
+    "answer": 1,
+    "explain": "노드 timeout은 시도 1회 단위이며 async 노드에서 동작합니다. 초과하면 NodeTimeoutError가 나고 retry_policy/error_handler가 적용됩니다. 클라이언트 timeout은 항상 기본 방어선입니다."
+  },
+  {
+    "q": "결제 노드 실행 직후, 체크포인트 저장 전에 프로세스가 죽었습니다. 재개 시 이중 결제를 막는 올바른 방법은?",
+    "options": [
+      "재개하지 말고 처음부터 다시 실행한다",
+      "uuid4()로 매번 새 멱등성 키를 만들어 결제 API에 보낸다",
+      "f\"order:{order_id}:charge\"처럼 결정적인 멱등성 키를 결제 API에 보내 같은 요청이 한 번만 처리되게 한다",
+      "durability=\"exit\"로 바꾼다"
+    ],
+    "answer": 2,
+    "explain": "실행은 at-least-once이므로 결제 노드는 다시 실행될 수 있습니다. 재실행해도 같은 값이 나오는 결정적 키를 써야 결제사가 중복 요청을 걸러 낼 수 있습니다."
+  }
+]

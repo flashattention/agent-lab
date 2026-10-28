@@ -1,0 +1,5 @@
+{
+  "title": "멀티 에이전트 시스템",
+  "description": "여러 에이전트가 역할을 나눠 협업하는 구조를 설계합니다. Supervisor, 핸드오프와 스웜, Plan-and-Execute, Reflection과 Evaluator-Optimizer, Deep Agents까지 현업 패턴을 직접 구현하고 라이브러리와 비교합니다.",
+  "icon": "network"
+}

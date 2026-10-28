@@ -1,0 +1,6 @@
+.gcloudignore
+.venv/
+__pycache__/
+.ruff_cache/
+data/
+*.sqlite

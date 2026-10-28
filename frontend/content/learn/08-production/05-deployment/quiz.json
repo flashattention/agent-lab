@@ -1,0 +1,57 @@
+[
+  {
+    "q": "API 워커를 여러 대로 수평 확장해도 대화가 끊기지 않게 하는 핵심 설계는?",
+    "options": [
+      "로드밸런서에 sticky session을 걸어 같은 사용자를 같은 워커로 보낸다",
+      "워커는 무상태로 두고 대화 상태를 공유 체크포인터(Postgres)에 thread_id로 저장한다",
+      "각 워커가 InMemorySaver를 쓰고 주기적으로 서로 동기화한다",
+      "대화 기록 전체를 매 요청마다 클라이언트가 보내게 한다"
+    ],
+    "answer": 1,
+    "explain": "체크포인터가 공유 저장소에 있으면 어느 워커가 요청을 받아도 같은 thread를 이어갈 수 있고, interrupt 후 재개 요청을 다른 워커가 처리해도 됩니다."
+  },
+  {
+    "q": "클라이언트가 보낸 thread_id를 그대로 체크포인터 키로 쓰면 생기는 문제는?",
+    "options": [
+      "성능이 느려진다",
+      "다른 사용자가 thread_id를 추측해 남의 대화에 접근할 수 있다",
+      "스트리밍이 동작하지 않는다",
+      "HITL interrupt가 저장되지 않는다"
+    ],
+    "answer": 1,
+    "explain": "서버가 인증된 사용자 ID로 네임스페이스(f\"{user}:{thread}\")를 강제하거나 스레드 소유자를 검사해야 테넌트가 격리됩니다."
+  },
+  {
+    "q": "async def 엔드포인트 안에서 동기 함수 agent.invoke()나 requests.get()을 호출하면?",
+    "options": [
+      "FastAPI가 자동으로 스레드풀로 옮겨 준다",
+      "이벤트 루프가 막혀 그 워커의 다른 모든 요청이 함께 멈춘다",
+      "아무 문제 없다",
+      "자동으로 ainvoke로 변환된다"
+    ],
+    "answer": 1,
+    "explain": "async 엔드포인트는 이벤트 루프에서 실행되므로 블로킹 호출이 루프 전체를 멈춥니다. ainvoke/astream과 async 클라이언트를 쓰거나 asyncio.to_thread로 넘깁니다."
+  },
+  {
+    "q": "사용자가 답을 기다리는 중에 같은 대화로 메시지를 또 보냈습니다(double-texting). 예제 서버가 409를 반환하는 이유는?",
+    "options": [
+      "같은 thread에서 두 실행이 동시에 돌면 체크포인트와 메시지 순서가 꼬이기 때문",
+      "LLM 제공자가 동시 요청을 금지해서",
+      "SSE는 동시에 하나의 연결만 허용해서",
+      "Pydantic 검증이 실패해서"
+    ],
+    "answer": 0,
+    "explain": "같은 스레드의 동시 실행은 경쟁 상태를 만듭니다. 거절(reject) 외에 interrupt, rollback, enqueue 정책도 있으며 Agent Server는 multitask_strategy로 이를 제공합니다."
+  },
+  {
+    "q": "langgraph.json의 graphs에 지정하는 그래프에 대한 설명으로 옳은 것은?",
+    "options": [
+      "반드시 InMemorySaver 체크포인터를 붙여 컴파일해야 한다",
+      "컴파일된 그래프나 그래프를 만드는 팩토리를 가리키며, 체크포인터는 플랫폼이 붙여 준다",
+      "FastAPI 앱 객체를 가리켜야 한다",
+      "그래프는 JSON 형식으로 직렬화해서 넣어야 한다"
+    ],
+    "answer": 1,
+    "explain": "Agent Server는 영속성(Postgres 체크포인터)을 직접 관리하므로 그래프에 체크포인터를 지정하지 않습니다. 커스텀 라우트는 http.app, 인증은 auth.path로 따로 지정합니다."
+  }
+]

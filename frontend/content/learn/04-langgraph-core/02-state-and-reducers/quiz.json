@@ -1,0 +1,32 @@
+[
+  {
+    "q": "리듀서가 없는 키 logs에 병렬로 실행되는 두 노드가 동시에 값을 쓰면 어떻게 되나요?",
+    "options": ["두 값이 자동으로 이어 붙는다", "나중에 끝난 노드의 값이 남는다", "InvalidUpdateError가 발생한다", "첫 번째 노드의 값만 남는다"],
+    "answer": 2,
+    "explain": "리듀서 없는 키는 한 슈퍼스텝에 값을 하나만 받을 수 있습니다. 병렬 노드가 같은 키에 쓰면 InvalidUpdateError가 나며, Annotated 리듀서로 해결합니다."
+  },
+  {
+    "q": "add_messages 리듀서의 동작으로 틀린 것은?",
+    "options": ["같은 id의 메시지가 오면 기존 메시지를 교체한다", "RemoveMessage(id=...)로 메시지를 삭제할 수 있다", "(\"user\", \"hi\") 튜플을 메시지 객체로 변환한다", "중복 내용의 메시지는 id와 상관없이 자동으로 제거한다"],
+    "answer": 3,
+    "explain": "add_messages는 내용이 아니라 id를 기준으로 교체·삭제합니다. 내용이 같아도 id가 다르면 별개의 메시지로 추가됩니다."
+  },
+  {
+    "q": "Annotated[list[str], operator.add]가 붙은 키를 빈 리스트로 초기화하려면 노드에서 무엇을 반환해야 하나요?",
+    "options": ["{\"logs\": []}", "{\"logs\": None}", "{\"logs\": Overwrite([])}", "초기화는 불가능하다"],
+    "answer": 2,
+    "explain": "빈 리스트를 반환하면 '기존 + []'라서 변화가 없습니다. Overwrite(value)는 리듀서를 우회해 값을 통째로 교체합니다."
+  },
+  {
+    "q": "StateGraph(Overall, input_schema=In, output_schema=Out)에서 output_schema의 효과는?",
+    "options": ["노드가 Out의 키만 쓸 수 있게 제한한다", "invoke 반환값을 Out의 키로 제한해 내부 키가 밖으로 새지 않게 한다", "출력값을 Pydantic으로 검증한다", "스트리밍 출력 형식을 바꾼다"],
+    "answer": 1,
+    "explain": "output_schema는 그래프의 최종 반환값에 포함될 키를 제한합니다. 내부 계산 키나 private state가 API 응답에 섞이지 않게 하는 인터페이스 설계 도구입니다."
+  },
+  {
+    "q": "Pydantic BaseModel로 상태를 선언했을 때의 설명으로 옳은 것은?",
+    "options": ["노드는 Pydantic 객체를 반환해야 한다", "invoke 결과도 Pydantic 객체로 돌아온다", "노드에 상태가 전달될 때 검증되며, 잘못된 입력은 ValidationError로 막힌다", "리듀서를 쓸 수 없다"],
+    "answer": 2,
+    "explain": "Pydantic 상태는 노드 입력으로 전달될 때 검증·변환됩니다. 노드는 여전히 dict 업데이트를 반환하고, invoke 결과는 dict입니다. Annotated 리듀서도 그대로 쓸 수 있습니다."
+  }
+]

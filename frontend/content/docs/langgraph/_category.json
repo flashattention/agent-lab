@@ -1,0 +1,6 @@
+{
+  "title": "LangGraph",
+  "description": "LangGraph v1 API 레퍼런스: StateGraph, 상태와 리듀서, Command/Send, interrupt, 체크포인터, Store, 스트리밍, 함수형 API, 정책과 오류",
+  "icon": "workflow",
+  "order": 2
+}

@@ -1,0 +1,57 @@
+[
+  {
+    "q": "LangChain v1에서 새 에이전트를 만들 때 사용해야 하는 표준 API는?",
+    "options": [
+      "langchain.agents.AgentExecutor",
+      "langgraph.prebuilt.create_react_agent",
+      "langchain.agents.create_agent",
+      "langchain.agents.initialize_agent"
+    ],
+    "answer": 2,
+    "explain": "v1의 표준은 langchain.agents.create_agent입니다. AgentExecutor·initialize_agent는 레거시이고, create_react_agent는 deprecated되어 create_agent로 대체되었습니다."
+  },
+  {
+    "q": "create_agent에 system_prompt를 넘겼을 때의 동작으로 옳은 것은?",
+    "options": [
+      "첫 호출에서만 사용되고 이후에는 무시된다",
+      "매 모델 호출마다 메시지 맨 앞에 붙지만, 상태의 messages 리스트에는 저장되지 않는다",
+      "상태의 messages 리스트 맨 앞에 SystemMessage로 영구 저장된다",
+      "도구 설명에 합쳐져 전달된다"
+    ],
+    "answer": 1,
+    "explain": "system_prompt는 model 노드가 호출될 때마다 앞에 붙습니다. 상태에는 저장되지 않으므로 result['messages']에 SystemMessage가 보이지 않습니다."
+  },
+  {
+    "q": "response_format=ToolStrategy(MySchema)를 사용할 때 구조화 결과는 어디에서 꺼내나요?",
+    "options": [
+      "result['messages'][-1].content",
+      "result['output']",
+      "result['structured_response']",
+      "agent.get_schema()"
+    ],
+    "answer": 2,
+    "explain": "구조화 응답은 상태의 structured_response 키에 스키마 인스턴스로 저장됩니다. ToolStrategy의 경우 마지막 메시지는 'Returning structured response…' ToolMessage입니다."
+  },
+  {
+    "q": "ToolStrategy와 ProviderStrategy의 차이로 옳은 것은?",
+    "options": [
+      "ToolStrategy는 스키마를 도구로 등록해 도구 호출을 강제하고, ProviderStrategy는 제공자의 네이티브 구조화 출력(json_schema)을 쓴다",
+      "ToolStrategy는 OpenAI에서만, ProviderStrategy는 모든 모델에서 동작한다",
+      "두 전략은 이름만 다르고 동작은 같다",
+      "ProviderStrategy는 handle_errors로 자동 재시도를 지원하고 ToolStrategy는 지원하지 않는다"
+    ],
+    "answer": 0,
+    "explain": "ToolStrategy는 도구 호출을 지원하는 대부분의 모델에서 동작하며 handle_errors로 재시도합니다. ProviderStrategy는 지원 모델에서 제공자가 스키마를 직접 강제합니다. 스키마만 넘기면 AutoStrategy가 모델에 맞게 선택합니다."
+  },
+  {
+    "q": "도구가 있는 create_agent 에이전트를 recursion_limit=2로 실행했더니 GraphRecursionError가 났습니다. 가장 적절한 해석은?",
+    "options": [
+      "모델 API 키가 잘못되었다",
+      "도구 호출 1회만 해도 model → tools → model 최소 3단계가 필요해 상한에 걸렸다",
+      "recursion_limit은 도구 개수를 의미한다",
+      "create_agent는 recursion_limit을 지원하지 않는다"
+    ],
+    "answer": 1,
+    "explain": "recursion_limit은 그래프 실행 단계 수의 상한입니다. 도구를 한 번 쓰는 가장 짧은 경로도 3단계이므로, 업무 특성에 맞는 여유 있는 값을 정하고 예외를 처리해야 합니다."
+  }
+]

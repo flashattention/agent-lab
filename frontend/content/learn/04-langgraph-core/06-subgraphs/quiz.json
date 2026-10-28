@@ -1,0 +1,32 @@
+[
+  {
+    "q": "부모와 서브그래프가 같은 키를 공유할 때 가장 간단한 연결 방법은?",
+    "options": ["래퍼 함수를 반드시 작성해야 한다", "builder.add_node(\"x\", compiled_subgraph)로 컴파일된 그래프를 노드로 직접 추가한다", "서브그래프를 compile하지 않고 builder 그대로 추가한다", "Send로 서브그래프를 호출한다"],
+    "answer": 1,
+    "explain": "컴파일된 그래프는 Runnable이므로 노드로 바로 추가할 수 있습니다. 겹치는 키를 통해 상태를 주고받습니다."
+  },
+  {
+    "q": "부모의 docs 키에 operator.add 리듀서가 있고, 공유 상태 서브그래프가 입력으로 받은 docs를 그대로 들고 있다가 끝나면 어떤 문제가 생길 수 있나요?",
+    "options": ["아무 문제 없다", "서브그래프의 최종 docs 전체가 부모에 다시 더해져 기존 항목이 중복된다", "InvalidUpdateError가 난다", "docs가 비워진다"],
+    "answer": 1,
+    "explain": "서브그래프는 변경분이 아니라 공유 키의 최종 값을 돌려주므로, 누적 리듀서와 만나면 중복될 수 있습니다. 서브그래프의 input_schema에서 그 키를 빼서 새 값만 돌려주게 하는 방식으로 해결합니다."
+  },
+  {
+    "q": "변환 상태 방식(래퍼 노드에서 sub.invoke 호출)의 장점으로 가장 알맞은 것은?",
+    "options": ["코드가 가장 짧다", "부모와 자식 스키마가 독립적이라 결합도가 낮고, 자식의 중간 메시지를 격리할 수 있다", "서브그래프가 더 빨리 실행된다", "체크포인터가 필요 없다"],
+    "answer": 1,
+    "explain": "래퍼가 필요한 것만 넣고 꺼내는 어댑터가 되어 인터페이스가 명확해지고, 하위 에이전트의 긴 도구 호출 기록이 부모 컨텍스트를 오염시키지 않습니다."
+  },
+  {
+    "q": "graph.stream(x, stream_mode=\"updates\", subgraphs=True)의 출력 형식은?",
+    "options": ["{노드: 업데이트}만 나온다", "(namespace, chunk) 튜플이며, 빈 튜플은 최상위 그래프를 뜻한다", "서브그래프 이벤트만 나온다", "메시지 토큰이 나온다"],
+    "answer": 1,
+    "explain": "subgraphs=True면 각 이벤트가 어느 그래프 경로에서 나왔는지 namespace 튜플과 함께 전달됩니다."
+  },
+  {
+    "q": "서브그래프 노드가 Command(graph=Command.PARENT, goto=\"refund_team\", update={...})를 반환할 때 옳은 설명은?",
+    "options": ["서브그래프 안 앞선 노드들의 업데이트도 모두 부모에 반영된다", "부모의 refund_team으로 이동하며, 부모 상태에는 Command의 update만 반영된다", "서브그래프 안의 refund_team 노드로 이동한다", "부모 그래프가 처음부터 다시 실행된다"],
+    "answer": 1,
+    "explain": "Command.PARENT로 빠져나가면 Command의 update만 부모 상태에 반영됩니다. 부모가 알아야 할 정보는 update에 명시적으로 담아야 합니다."
+  }
+]

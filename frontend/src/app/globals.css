@@ -1,0 +1,192 @@
+@import "tailwindcss";
+@import "@xyflow/react/dist/style.css";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --bg: #fafafa;
+  --surface: #ffffff;
+  --surface-2: #f4f4f5;
+  --surface-3: #e9e9ec;
+  --border: #e4e4e7;
+  --border-strong: #d4d4d8;
+  --fg: #18181b;
+  --fg-2: #3f3f46;
+  --muted: #71717a;
+  --accent: #6d28d9;
+  --accent-2: #2563eb;
+  --accent-soft: #ede9fe;
+  --accent-fg: #ffffff;
+  --success: #059669;
+  --warning: #d97706;
+  --danger: #dc2626;
+  --danger-soft: #fee2e2;
+  --code-bg: #f6f6f8;
+  --grid: #e4e4e7;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 4px 16px rgb(0 0 0 / 0.04);
+}
+
+.dark {
+  --bg: #09090b;
+  --surface: #111114;
+  --surface-2: #18181c;
+  --surface-3: #232329;
+  --border: #26262c;
+  --border-strong: #3a3a42;
+  --fg: #f4f4f5;
+  --fg-2: #d4d4d8;
+  --muted: #a1a1aa;
+  --accent: #a78bfa;
+  --accent-2: #60a5fa;
+  --accent-soft: #2e1f5e;
+  --accent-fg: #0b0b0f;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --danger-soft: #3b1515;
+  --code-bg: #0e0e12;
+  --grid: #1f1f25;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.35);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-fg: var(--fg);
+  --color-fg-2: var(--fg-2);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-fg: var(--accent-fg);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-code: var(--code-bg);
+  --font-sans: "Pretendard Variable", Pretendard, var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
+  --shadow-soft: var(--shadow);
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.text-gradient {
+  background: linear-gradient(120deg, var(--accent), var(--accent-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.bg-grid {
+  background-image: radial-gradient(var(--grid) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+/* ---------------------------------------------------------------- prose */
+.prose {
+  font-size: 15.5px;
+  line-height: 1.8;
+  color: var(--fg-2);
+}
+.prose h1 { font-size: 1.9rem; font-weight: 750; color: var(--fg); letter-spacing: -0.02em; margin: 0 0 0.6em; line-height: 1.3; }
+.prose h2 { font-size: 1.4rem; font-weight: 700; color: var(--fg); letter-spacing: -0.015em; margin: 2.2em 0 0.7em; padding-top: 0.4em; border-top: 1px solid var(--border); line-height: 1.35; }
+.prose h3 { font-size: 1.12rem; font-weight: 650; color: var(--fg); margin: 1.8em 0 0.5em; }
+.prose h4 { font-size: 1rem; font-weight: 650; color: var(--fg); margin: 1.4em 0 0.4em; }
+.prose p { margin: 0.85em 0; }
+.prose a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+.prose strong { color: var(--fg); font-weight: 650; }
+.prose ul, .prose ol { margin: 0.8em 0; padding-left: 1.4em; }
+.prose ul { list-style: disc; }
+.prose ol { list-style: decimal; }
+.prose li { margin: 0.3em 0; }
+.prose li::marker { color: var(--muted); }
+.prose hr { border-color: var(--border); margin: 2em 0; }
+.prose blockquote { border-left: 3px solid var(--border-strong); padding: 0.2em 1em; color: var(--muted); margin: 1em 0; }
+.prose :not(pre) > code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  padding: 0.1em 0.38em;
+  border-radius: 6px;
+  color: var(--fg);
+}
+.prose pre {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.65;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1em 1.1em;
+  overflow-x: auto;
+  margin: 1.1em 0;
+}
+.prose table { width: 100%; border-collapse: collapse; margin: 1.2em 0; font-size: 0.92em; display: block; overflow-x: auto; }
+.prose th { text-align: left; font-weight: 600; color: var(--fg); background: var(--surface-2); }
+.prose th, .prose td { border: 1px solid var(--border); padding: 0.5em 0.75em; vertical-align: top; }
+.prose img { border-radius: 12px; }
+
+/* ---------------------------------------------------------------- highlight.js (theme-aware) */
+.hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-name { color: #7c3aed; }
+.hljs-string, .hljs-attr-value, .hljs-template-string { color: #059669; }
+.hljs-number, .hljs-literal { color: #d97706; }
+.hljs-comment, .hljs-quote { color: #8a8a95; font-style: italic; }
+.hljs-title, .hljs-title.function_, .hljs-section { color: #2563eb; }
+.hljs-attr, .hljs-variable, .hljs-params { color: #be185d; }
+.hljs-meta, .hljs-decorator { color: #0891b2; }
+.hljs-type, .hljs-class { color: #b45309; }
+.dark .hljs-keyword, .dark .hljs-selector-tag, .dark .hljs-built_in, .dark .hljs-name { color: #c4b5fd; }
+.dark .hljs-string, .dark .hljs-attr-value, .dark .hljs-template-string { color: #6ee7b7; }
+.dark .hljs-number, .dark .hljs-literal { color: #fcd34d; }
+.dark .hljs-comment, .dark .hljs-quote { color: #6b6b78; }
+.dark .hljs-title, .dark .hljs-title.function_, .dark .hljs-section { color: #93c5fd; }
+.dark .hljs-attr, .dark .hljs-variable, .dark .hljs-params { color: #f9a8d4; }
+.dark .hljs-meta, .dark .hljs-decorator { color: #67e8f9; }
+.dark .hljs-type, .dark .hljs-class { color: #fdba74; }
+
+/* ---------------------------------------------------------------- React Flow theming */
+.react-flow { --xy-background-color: transparent; }
+.react-flow__attribution { display: none; }
+.react-flow__edge-path { stroke: var(--border-strong); stroke-width: 1.6; }
+.react-flow__edge.selected .react-flow__edge-path { stroke: var(--accent); }
+.react-flow__edge.edge-error .react-flow__edge-path { stroke: var(--danger) !important; stroke-width: 2.2; }
+.react-flow__edge.edge-warn .react-flow__edge-path { stroke: var(--warning) !important; }
+.react-flow__edge.edge-conditional .react-flow__edge-path { stroke-dasharray: 6 4; }
+.react-flow__handle { width: 10px; height: 10px; background: var(--surface); border: 2px solid var(--border-strong); }
+.react-flow__handle:hover { border-color: var(--accent); }
+.react-flow__controls { box-shadow: var(--shadow); border-radius: 10px; overflow: hidden; border: 1px solid var(--border); }
+.react-flow__controls-button { background: var(--surface); border-color: var(--border); color: var(--fg); fill: var(--fg); }
+.react-flow__controls-button:hover { background: var(--surface-2); }
+.react-flow__minimap { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.react-flow__edge-textbg { fill: var(--surface); }
+.react-flow__edge-text { fill: var(--fg-2); font-size: 11px; font-weight: 500; }
+
+@keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 45%, transparent); } 100% { box-shadow: 0 0 0 10px transparent; } }
+.pulse-danger { animation: pulse-ring 1.6s ease-out infinite; }
+
+@keyframes fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.fade-in { animation: fade-in 0.25s ease-out both; }

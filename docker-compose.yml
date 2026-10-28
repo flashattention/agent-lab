@@ -1,0 +1,36 @@
+# 단일 서버(VPS) 배포: docker compose up -d --build
+# 도메인/HTTPS 는 앞단 리버스 프록시(Caddy, Nginx, Cloudflare Tunnel 등)에서 처리하세요.
+services:
+  api:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      AGENTLAB_CORS_ORIGINS: ${WEB_ORIGIN:-http://localhost:3000}
+      AGENTLAB_REFINE_MODEL: ${REFINE_MODEL:-gpt-5}
+    volumes:
+      - refine-cache:/data
+    ports:
+      - "8000:8000"
+    # 샌드박스 강화: 읽기 전용 루트 FS + 쓰기 가능한 tmpfs, 권한 상승 차단, 자원 상한
+    read_only: true
+    tmpfs:
+      - /tmp:size=512m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    pids_limit: 512
+    mem_limit: 4g
+    cpus: 2
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
+    restart: unless-stopped
+    depends_on: [api]
+    ports:
+      - "3000:3000"
+
+volumes:
+  refine-cache:

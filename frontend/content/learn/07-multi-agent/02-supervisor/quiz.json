@@ -1,0 +1,57 @@
+[
+  {
+    "q": "Supervisor의 라우팅 결정을 `Literal[\"researcher\", \"writer\", \"FINISH\"]` 구조화 출력으로 받는 가장 큰 이유는?",
+    "options": [
+      "응답 속도가 항상 빨라지기 때문",
+      "선택지를 스키마로 닫아 파싱 실패와 존재하지 않는 노드로의 이동을 막기 위해",
+      "temperature를 0으로 고정하기 위해",
+      "체크포인터가 구조화 출력만 저장할 수 있기 때문"
+    ],
+    "answer": 1,
+    "explain": "자유 텍스트를 파싱하면 언젠가 깨집니다. Literal로 선택지를 제한하면 모델은 정해진 값 중 하나만 고를 수 있습니다."
+  },
+  {
+    "q": "노드 함수의 반환 타입을 `Command[Literal[\"researcher\", \"writer\", \"__end__\"]]`로 적는 효과로 옳은 것은?",
+    "options": [
+      "적지 않으면 그래프가 컴파일되지 않는다",
+      "LangGraph가 가능한 이동 경로를 파악해 그래프 시각화에 표시한다",
+      "모델이 자동으로 FINISH를 고르게 된다",
+      "recursion_limit이 자동으로 설정된다"
+    ],
+    "answer": 1,
+    "explain": "타입 힌트로 가능한 목적지를 알려주면 그래프 그림에 점선 경로가 그려지고 구조를 점검하기 쉬워집니다."
+  },
+  {
+    "q": "작업자 노드가 작업자 에이전트의 전체 메시지 대신 '최종 메시지 하나'만 공유 상태에 넣는 이유는?",
+    "options": [
+      "LangGraph가 한 번에 한 메시지만 허용하기 때문",
+      "관리자 컨텍스트를 깨끗하게 유지하고 토큰 비용을 줄이기 위해",
+      "AIMessage에는 name을 붙일 수 없기 때문",
+      "Mock 모델에서만 필요한 우회책이기 때문"
+    ],
+    "answer": 1,
+    "explain": "작업자 내부의 도구 호출과 긴 결과는 관리자 판단에 필요 없는 경우가 많습니다. 결과만 공유하면 컨텍스트 오염과 비용이 줄어듭니다."
+  },
+  {
+    "q": "MAX_STEPS 카운터와 recursion_limit을 함께 두는 이유로 가장 적절한 것은?",
+    "options": [
+      "둘은 같은 기능이므로 하나만 두면 된다",
+      "MAX_STEPS는 정상 종료 경로로 빠져 부분 결과를 돌려줄 수 있고, recursion_limit은 그래프 전체의 최후 방어선이다",
+      "recursion_limit은 Mock 모드에서만 동작한다",
+      "MAX_STEPS가 있으면 LLM 호출 비용이 0이 된다"
+    ],
+    "answer": 1,
+    "explain": "recursion_limit에 걸리면 GraphRecursionError 예외가 납니다. 비즈니스 상한을 따로 두면 예외 없이 END로 가서 지금까지의 결과를 활용할 수 있습니다."
+  },
+  {
+    "q": "langgraph-supervisor의 create_supervisor에 대한 설명으로 옳지 않은 것은?",
+    "options": [
+      "작업자마다 transfer_to_<이름> 핸드오프 도구를 관리자에게 붙인다",
+      "컴파일 전 StateGraph를 반환하므로 compile()이 필요하다",
+      "작업자 에이전트에 name이 없어도 자동으로 번호를 붙여 동작한다",
+      "output_mode로 작업자의 마지막 메시지만 남길지 전체 기록을 남길지 고를 수 있다"
+    ],
+    "answer": 2,
+    "explain": "작업자 이름은 핸드오프 도구 이름과 노드 이름을 만드는 데 쓰이므로 create_agent(..., name=...)로 반드시 지정해야 합니다."
+  }
+]

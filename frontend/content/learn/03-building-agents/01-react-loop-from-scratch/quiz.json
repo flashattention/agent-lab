@@ -1,0 +1,57 @@
+[
+  {
+    "q": "ReAct 루프에서 모델이 반환한 AIMessage의 tool_calls를 실제로 '실행'하는 주체는 누구인가요?",
+    "options": [
+      "LLM 제공자(OpenAI) 서버",
+      "LLM이 내부적으로 Python 인터프리터를 실행한다",
+      "우리 애플리케이션 코드(루프)",
+      "LangSmith"
+    ],
+    "answer": 2,
+    "explain": "모델은 '이 도구를 이 인자로 불러 달라'는 요청서(tool_calls)만 만듭니다. 실제 함수 실행과 결과 전달(ToolMessage)은 항상 우리 코드의 책임입니다."
+  },
+  {
+    "q": "ToolMessage를 만들 때 tool_call_id를 반드시 넣어야 하는 이유로 가장 알맞은 것은?",
+    "options": [
+      "토큰 비용을 줄이기 위해",
+      "어떤 도구 요청에 대한 결과인지 짝지어 주기 위해 (없으면 API가 요청을 거부한다)",
+      "도구 실행 속도를 높이기 위해",
+      "LangSmith 트레이싱을 켜기 위해"
+    ],
+    "answer": 1,
+    "explain": "모델은 한 번에 여러 도구를 병렬로 요청할 수 있습니다. tool_call_id는 각 요청과 결과를 연결하는 영수증 번호이며, AIMessage의 모든 tool_call에 대응하는 ToolMessage가 있어야 합니다."
+  },
+  {
+    "q": "도구 실행 중 예외가 발생했을 때 권장되는 처리 방식은?",
+    "options": [
+      "예외를 그대로 던져 에이전트 실행 전체를 중단한다",
+      "해당 tool_call을 조용히 무시하고 다음 단계로 넘어간다",
+      "오류 내용을 ToolMessage(status=\"error\")로 모델에게 돌려줘 스스로 복구할 기회를 준다",
+      "사용자에게 즉시 '오류가 발생했습니다'라고 답한다"
+    ],
+    "answer": 2,
+    "explain": "오류도 하나의 관찰(Observation)입니다. 모델이 오류 메시지를 보고 인자를 고쳐 재시도할 수 있습니다. 조용히 무시하면 tool_call_id 짝이 깨져 API 오류가 납니다."
+  },
+  {
+    "q": "다음 중 에이전트 루프에 max_iterations 같은 반복 상한이 꼭 필요한 이유가 아닌 것은?",
+    "options": [
+      "모델이 같은 도구를 끝없이 호출하는 무한 루프를 막기 위해",
+      "반복할 때마다 전체 대화가 다시 입력 토큰으로 청구되어 비용이 커지므로",
+      "응답 지연이 사용자 허용 범위를 넘지 않게 하기 위해",
+      "상한이 있어야 모델이 도구 호출 기능을 활성화하기 때문에"
+    ],
+    "answer": 3,
+    "explain": "도구 호출 기능은 bind_tools로 활성화되며 반복 상한과 무관합니다. 상한은 비용·지연·무한 루프를 막는 안전장치입니다."
+  },
+  {
+    "q": "직접 구현한 ReAct 루프와 create_agent가 만드는 그래프의 대응으로 옳은 것은?",
+    "options": [
+      "model 노드 = 도구 실행 for 문, tools 노드 = llm.invoke",
+      "model 노드 = llm_with_tools.invoke, tools 노드 = 도구 실행, 조건부 엣지 = 'tool_calls가 있는가?'",
+      "create_agent는 루프 없이 모델을 한 번만 호출한다",
+      "create_agent는 ReAct가 아니라 Plan-and-Execute 구조다"
+    ],
+    "answer": 1,
+    "explain": "create_agent의 내부 그래프는 model ↔ tools를 오가는 ReAct 루프이며, tool_calls 유무로 계속할지 종료할지를 결정합니다."
+  }
+]

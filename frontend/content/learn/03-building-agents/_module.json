@@ -1,0 +1,5 @@
+{
+  "title": "create_agent로 에이전트 만들기",
+  "description": "ReAct 루프를 직접 구현해 원리를 익힌 뒤, LangChain v1의 create_agent와 미들웨어, 메모리·컨텍스트 엔지니어링으로 현업 수준의 에이전트를 만듭니다.",
+  "icon": "bot"
+}

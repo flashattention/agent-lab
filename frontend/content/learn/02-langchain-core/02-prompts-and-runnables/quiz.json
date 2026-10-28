@@ -1,0 +1,32 @@
+[
+  {
+    "q": "ChatPromptTemplate에서 대화 기록(메시지 리스트 전체)을 끼워 넣을 자리를 만드는 방법은?",
+    "options": ["(\"human\", \"{history}\")", "MessagesPlaceholder(\"history\")", "prompt.partial(history=[])", "RunnablePassthrough()"],
+    "answer": 1,
+    "explain": "MessagesPlaceholder는 메시지 리스트를 통째로 삽입합니다. (\"human\", \"{history}\")는 리스트를 문자열로 바꿔 한 메시지에 넣어 버립니다."
+  },
+  {
+    "q": "`chain = prompt | llm | StrOutputParser()`에 대한 설명으로 틀린 것은?",
+    "options": ["chain도 Runnable이므로 batch와 stream을 쓸 수 있다", "앞 단계의 출력이 다음 단계의 입력이 된다", "chain.stream()을 쓰면 파서까지 거친 결과가 조각 단위로 나온다", "chain은 invoke만 지원하고 비동기 호출은 지원하지 않는다"],
+    "answer": 3,
+    "explain": "모든 Runnable은 ainvoke/abatch/astream 같은 비동기 메서드를 공통으로 가집니다."
+  },
+  {
+    "q": "입력 dict를 그대로 유지하면서 새 키(analysis)를 추가하고 싶다. 가장 알맞은 것은?",
+    "options": ["RunnableLambda(lambda x: x)", "RunnablePassthrough.assign(analysis=analyze)", "RunnableParallel(analysis=analyze)", "analyze.with_fallbacks([...])"],
+    "answer": 1,
+    "explain": "RunnableParallel(analysis=...)은 analysis 키만 남깁니다. assign은 원래 키를 유지하면서 키를 추가합니다."
+  },
+  {
+    "q": "with_retry를 설정할 때 가장 바람직한 것은?",
+    "options": ["모든 예외(Exception)를 10번씩 재시도한다", "401 인증 오류를 우선 재시도한다", "타임아웃·연결 오류처럼 일시적인 오류만 골라 지수 백오프+지터로 재시도한다", "재시도 사이에 고정 0초 대기를 둔다"],
+    "answer": 2,
+    "explain": "400/401 같은 영구 오류는 재시도해도 실패하며 비용과 지연만 늘립니다. 일시적 오류만 골라, 지터를 섞은 지수 백오프로 재시도하는 것이 정석입니다."
+  },
+  {
+    "q": "폴백(fallback) 모델 선택에 대한 현업 조언으로 가장 적절한 것은?",
+    "options": ["주 모델과 같은 제공자의 같은 모델을 둔다", "다른 제공자나 다른 리전의 모델을 두고, 폴백 경로도 평가로 검증한다", "폴백은 테스트할 필요가 없다", "폴백 대신 재시도 횟수를 무한으로 늘린다"],
+    "answer": 1,
+    "explain": "같은 제공자는 전체 장애 때 함께 실패합니다. 또한 폴백 모델은 출력 품질·형식이 다를 수 있으므로 별도로 평가해야 합니다."
+  }
+]

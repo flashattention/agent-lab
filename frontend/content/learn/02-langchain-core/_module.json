@@ -1,0 +1,5 @@
+{
+  "title": "LangChain v1 핵심",
+  "description": "에이전트를 이루는 다섯 가지 부품을 익힙니다. 메시지와 표준 콘텐츠 블록, 프롬프트와 Runnable(LCEL), 구조화 출력, 도구 호출, 스트리밍까지 LangChain v1의 기본 인터페이스를 현업 수준으로 다룹니다.",
+  "icon": "blocks"
+}

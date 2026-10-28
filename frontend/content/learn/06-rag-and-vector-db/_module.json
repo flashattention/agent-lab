@@ -1,0 +1,5 @@
+{
+  "title": "RAG와 벡터 DB",
+  "description": "임베딩과 유사도 계산부터 청킹, 벡터 DB, 하이브리드 검색·리랭킹, Agentic RAG, Corrective/Self/Adaptive RAG와 RAG 평가까지. 에이전트가 '내 데이터'를 근거로 답하게 만드는 검색 증강 생성을 현업 수준으로 익힙니다.",
+  "icon": "database"
+}

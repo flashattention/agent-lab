@@ -1,0 +1,32 @@
+[
+  {
+    "q": "LangGraph 노드 함수가 반환해야 하는 것으로 가장 알맞은 것은?",
+    "options": ["수정한 상태 객체 전체", "업데이트할 키만 담은 딕셔너리", "다음에 실행할 노드 이름", "항상 None"],
+    "answer": 1,
+    "explain": "노드는 상태를 직접 수정하지 않고 바뀐 키만 담은 dict(부분 업데이트)를 반환합니다. LangGraph가 이를 기존 상태와 합칩니다. 다음 노드 지정은 엣지(또는 4.4의 Command)의 몫입니다."
+  },
+  {
+    "q": "builder.compile()의 역할로 틀린 것은?",
+    "options": ["그래프 구조를 검증한다", "체크포인터 같은 런타임 부품을 연결할 수 있다", "invoke/stream 가능한 실행 객체를 만든다", "모든 노드를 한 번씩 미리 실행해 본다"],
+    "answer": 3,
+    "explain": "compile은 구조 검증과 실행 객체 생성을 하고 checkpointer/store/cache 등을 받을 수 있지만, 노드를 미리 실행하지는 않습니다."
+  },
+  {
+    "q": "builder.add_edge([\"check_length\", \"check_profanity\"], \"decide\")의 의미는?",
+    "options": ["둘 중 먼저 끝난 노드가 decide를 실행한다", "두 노드가 모두 끝난 뒤 decide를 실행한다", "decide가 두 노드를 순서대로 호출한다", "문법 오류다"],
+    "answer": 1,
+    "explain": "시작점에 리스트를 주면 합류(join) 엣지가 되어, 나열한 노드가 모두 완료된 뒤에 대상 노드가 실행됩니다."
+  },
+  {
+    "q": "실행 중 각 노드가 반환한 업데이트만 순서대로 보고 싶을 때 가장 적합한 호출은?",
+    "options": ["graph.invoke(x)", "graph.stream(x, stream_mode=\"updates\")", "graph.get_graph().draw_mermaid()", "graph.batch([x])"],
+    "answer": 1,
+    "explain": "stream_mode=\"updates\"는 {노드이름: 업데이트} 형태로 노드별 변경분을 내보냅니다. \"values\"는 매 단계의 전체 상태를 보여줍니다."
+  },
+  {
+    "q": "현업에서 '노드 하나에 LLM 호출 하나'를 권장하는 가장 큰 이유는?",
+    "options": ["LangGraph가 노드당 LLM 호출을 한 번만 허용해서", "재시도·캐시·체크포인트가 노드 단위로 동작해 실패 시 복구 범위가 작아져서", "노드가 많을수록 토큰이 절약되어서", "Mermaid 그림이 예뻐져서"],
+    "answer": 1,
+    "explain": "RetryPolicy, CachePolicy, 체크포인트가 모두 노드 경계에서 동작하므로, LLM 호출을 노드 단위로 나누면 실패한 부분만 다시 실행할 수 있습니다."
+  }
+]

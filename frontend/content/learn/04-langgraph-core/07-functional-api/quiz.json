@@ -1,0 +1,32 @@
+[
+  {
+    "q": "@task로 장식한 함수를 호출하면 무엇이 반환되나요?",
+    "options": ["함수의 반환값", "퓨처(future) 객체. .result()로 값을 받는다", "컴파일된 그래프", "None"],
+    "answer": 1,
+    "explain": "task 호출은 퓨처를 반환합니다. 여러 퓨처를 먼저 만들고 나중에 .result()로 모으면 병렬 실행됩니다."
+  },
+  {
+    "q": "다음 중 task 3개를 병렬로 실행하는 코드는?",
+    "options": ["[t(x).result() for x in xs]", "fs = [t(x) for x in xs]; [f.result() for f in fs]", "for x in xs: t(x).result()", "t(xs).result()"],
+    "answer": 1,
+    "explain": "호출 즉시 .result()를 붙이면 하나가 끝나야 다음이 출발하므로 순차 실행입니다. 퓨처를 모두 만든 뒤 결과를 기다려야 병렬입니다."
+  },
+  {
+    "q": "체크포인터가 있는 entrypoint에서 두 번째 task가 실패한 뒤 invoke(None, 같은 thread_id)로 재개하면?",
+    "options": ["모든 task가 처음부터 다시 실행된다", "entrypoint 본문은 다시 실행되지만, 이미 성공한 task는 저장된 결과를 재사용한다", "실패한 task만 실행되고 entrypoint 본문은 실행되지 않는다", "재개는 Graph API에서만 가능하다"],
+    "answer": 1,
+    "explain": "재개 시 본문은 처음부터 다시 실행되지만 성공한 task 호출은 저장된 결과로 대체됩니다. 그래서 부수 효과와 비결정적 코드는 task 안에 둬야 합니다."
+  },
+  {
+    "q": "entrypoint.final(value=a, save=b)의 의미는?",
+    "options": ["a와 b를 모두 호출자에게 반환한다", "호출자에게는 a를 반환하고, 같은 스레드의 다음 실행에서 previous로 b를 받는다", "a를 체크포인트에 저장하고 b를 반환한다", "실행을 즉시 종료하고 b를 버린다"],
+    "answer": 1,
+    "explain": "value는 반환값, save는 다음 실행의 previous로 전달될 값입니다. 챗봇에서 이번 답변만 반환하고 전체 기록은 저장할 때 유용합니다."
+  },
+  {
+    "q": "Functional API보다 Graph API가 더 적합한 경우는?",
+    "options": ["기존 배치 스크립트에 재개 기능만 얹고 싶을 때", "단순 선형 흐름의 빠른 프로토타입", "복잡한 분기와 멀티 에이전트 구조를 여러 사람이 그림으로 보며 함께 관리해야 할 때", "Python for 루프로 충분히 표현되는 반복"],
+    "answer": 2,
+    "explain": "Graph API는 흐름이 노드·엣지로 명시되어 시각화, 상태 단위 디버깅, 타임 트래블에 강합니다. 나머지 경우는 Functional API가 더 간결합니다."
+  }
+]

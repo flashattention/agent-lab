@@ -1,0 +1,52 @@
+[
+  {
+    "q": "init_chat_model(\"openai:gpt-5-mini\")에서 \"openai:\" 부분의 역할은?",
+    "options": [
+      "API 키를 지정한다",
+      "모델 제공자(provider)를 지정해 알맞은 채팅 모델 클래스를 고르게 한다",
+      "모델 버전을 고정한다",
+      "스트리밍을 켠다"
+    ],
+    "answer": 1,
+    "explain": "init_chat_model은 '제공자:모델명' 형식에서 제공자를 읽어 ChatOpenAI 같은 통합 클래스를 생성합니다. 제공자를 바꿔도 이후 코드는 그대로 쓸 수 있습니다."
+  },
+  {
+    "q": "사용자 체감 속도(첫 글자가 보이기까지의 시간)를 개선하는 데 가장 직접적인 방법은?",
+    "options": ["batch", "stream", "max_retries 증가", "with_fallbacks"],
+    "answer": 1,
+    "explain": "stream은 토큰이 생성되는 대로 전달하므로 TTFT(Time To First Token)만 기다리면 화면에 출력이 시작됩니다. batch는 처리량(throughput)을 높이는 도구입니다."
+  },
+  {
+    "q": "다음 중 재시도(retry)해도 해결되지 않으므로 재시도 대상에서 빼야 하는 오류는?",
+    "options": [
+      "RateLimitError (429)",
+      "APITimeoutError",
+      "AuthenticationError (잘못된 API 키)",
+      "InternalServerError (5xx)"
+    ],
+    "answer": 2,
+    "explain": "인증 오류나 잘못된 요청(BadRequest)은 같은 요청을 다시 보내도 실패합니다. 일시적인 429, 타임아웃, 5xx, 연결 오류만 지수 백오프로 재시도합니다."
+  },
+  {
+    "q": "stream()으로 받은 AIMessageChunk들을 하나의 메시지로 합치는 올바른 방법은?",
+    "options": [
+      "청크들을 리스트에 넣고 마지막 것만 쓴다",
+      "청크끼리 + 연산자로 더한다",
+      "각 청크의 usage_metadata를 더한다",
+      "invoke를 한 번 더 호출한다"
+    ],
+    "answer": 1,
+    "explain": "AIMessageChunk는 + 연산으로 텍스트, tool_call_chunks, usage_metadata 등을 올바르게 병합합니다."
+  },
+  {
+    "q": "100개의 질문을 batch로 처리하던 중 3개가 실패했다. 나머지 97개 결과를 잃지 않으려면?",
+    "options": [
+      "max_concurrency=1로 설정한다",
+      "return_exceptions=True를 주고, 결과 중 Exception 인스턴스만 따로 처리한다",
+      "try/except로 batch 전체를 감싼다",
+      "stream으로 바꾼다"
+    ],
+    "answer": 1,
+    "explain": "return_exceptions=True면 실패한 항목 자리에 예외 객체가 들어가고 나머지 결과는 정상적으로 돌아옵니다. try/except로 전체를 감싸면 성공한 결과까지 잃습니다."
+  }
+]

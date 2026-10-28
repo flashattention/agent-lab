@@ -1,0 +1,5 @@
+{
+  "title": "LangGraph 핵심",
+  "description": "상태(State)·노드·엣지로 에이전트의 제어 흐름을 직접 설계합니다. 리듀서, 조건부 라우팅, Command/Send, 직접 만드는 ReAct 에이전트, 서브그래프, Functional API까지 LangGraph v1의 뼈대를 익힙니다.",
+  "icon": "workflow"
+}

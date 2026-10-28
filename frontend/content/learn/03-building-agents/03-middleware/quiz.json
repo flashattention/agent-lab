@@ -1,0 +1,57 @@
+[
+  {
+    "q": "middleware=[A, B]로 등록했을 때 한 번의 모델 호출에서 훅이 실행되는 순서로 옳은 것은?",
+    "options": [
+      "A.before_model → B.before_model → A.wrap(바깥) → B.wrap(안쪽) → 모델 → B.after_model → A.after_model",
+      "B.before_model → A.before_model → 모델 → A.after_model → B.after_model",
+      "A.before_model → A.after_model → B.before_model → B.after_model",
+      "등록 순서와 무관하게 무작위로 실행된다"
+    ],
+    "answer": 0,
+    "explain": "before 훅은 등록 순, wrap 훅은 먼저 등록된 것이 바깥(양파 껍질), after 훅은 역순입니다. 웹 프레임워크의 미들웨어 스택과 같은 규칙입니다."
+  },
+  {
+    "q": "모델 호출이 실패하면 같은 요청으로 다시 시도하는 로직을 직접 만들려고 합니다. 가장 적합한 훅은?",
+    "options": [
+      "before_agent",
+      "after_model",
+      "wrap_model_call",
+      "after_agent"
+    ],
+    "answer": 2,
+    "explain": "wrap_model_call은 handler(request)를 직접 호출하므로 try/except로 감싸 여러 번 부르거나, 다른 모델로 override해 부를 수 있습니다. 노드형 훅은 모델 호출 자체를 제어하지 못합니다."
+  },
+  {
+    "q": "before_model 훅에서 {\"jump_to\": \"end\"}를 반환했는데 종료되지 않았습니다. 가장 가능성 높은 원인은?",
+    "options": [
+      "jump_to는 after_agent에서만 쓸 수 있다",
+      "데코레이터에 can_jump_to=[\"end\"]를 선언하지 않아 그래프에 해당 엣지가 없다",
+      "jump_to 값은 \"__end__\"여야 한다",
+      "checkpointer가 없어서"
+    ],
+    "answer": 1,
+    "explain": "jump_to로 이동할 목적지는 @before_model(can_jump_to=[\"end\"])처럼 미리 선언해야 그래프 컴파일 시 조건부 엣지가 만들어집니다. 클래스형에서는 @hook_config(can_jump_to=[...])를 씁니다."
+  },
+  {
+    "q": "다음 요구사항과 내장 미들웨어의 연결이 잘못된 것은?",
+    "options": [
+      "환불 도구 실행 전 사람 승인 → HumanInTheLoopMiddleware",
+      "한 요청에서 모델을 10번 넘게 부르지 않기 → ModelCallLimitMiddleware(run_limit=10)",
+      "주 모델 장애 시 다른 모델 사용 → ModelFallbackMiddleware",
+      "대화가 길어지면 오래된 메시지를 요약 → PIIMiddleware"
+    ],
+    "answer": 3,
+    "explain": "대화 요약은 SummarizationMiddleware의 역할입니다. PIIMiddleware는 이메일·카드번호 등 개인정보를 탐지해 차단/가림/마스킹/해시합니다."
+  },
+  {
+    "q": "ToolRetryMiddleware를 적용할 때 현업에서 가장 주의해야 할 점은?",
+    "options": [
+      "재시도는 항상 0초 간격으로 해야 빠르다",
+      "결제·메일 발송처럼 멱등하지 않은 도구는 재시도 대상에서 제외하거나 멱등키를 사용한다",
+      "모든 도구에 무한 재시도를 건다",
+      "재시도 미들웨어는 반드시 리스트 맨 마지막에 하나만 둘 수 있다"
+    ],
+    "answer": 1,
+    "explain": "부수효과가 있는 도구를 재시도하면 결제나 발송이 중복될 수 있습니다. tools=[...] 인자로 대상을 한정하고, 지수 백오프와 jitter를 사용하는 것이 기본입니다."
+  }
+]

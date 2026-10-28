@@ -1,0 +1,57 @@
+[
+  {
+    "q": "노드 안에서 interrupt()로 멈춘 뒤 Command(resume=값)으로 재개하면 노드는 어디서부터 실행되나요?",
+    "options": [
+      "interrupt() 호출 바로 다음 줄부터",
+      "노드 함수의 처음부터 다시 실행되고, interrupt()가 resume 값을 반환한다",
+      "다음 노드부터 실행되고 resume 값은 상태에 자동 저장된다",
+      "그래프의 START부터 전체가 다시 실행된다"
+    ],
+    "answer": 1,
+    "explain": "LangGraph는 함수의 중간 줄로 점프할 수 없으므로 멈춘 노드를 처음부터 다시 실행합니다. 이때 interrupt()는 멈추지 않고 저장된 resume 값을 돌려줍니다. 그래서 interrupt 앞의 부수효과는 두 번 실행됩니다."
+  },
+  {
+    "q": "다음 중 interrupt를 사용하는 노드에서 피해야 할 코드는?",
+    "options": [
+      "interrupt 반환값으로 Command(goto=...)를 고르는 코드",
+      "interrupt 이전에 결제 API를 호출하는 코드",
+      "interrupt에 dict 형태의 승인 요청을 넘기는 코드",
+      "부수효과를 interrupt 뒤의 별도 노드에 두는 코드"
+    ],
+    "answer": 1,
+    "explain": "재개 시 노드가 처음부터 다시 실행되므로 interrupt 앞의 결제 호출이 중복 실행됩니다. 부수효과는 interrupt 뒤나 별도 노드에 두고, 멱등하게 만드세요."
+  },
+  {
+    "q": "병렬로 실행된 두 노드가 각각 interrupt를 걸어 out.interrupts에 2개가 있을 때 올바른 재개 방법은?",
+    "options": [
+      "Command(resume=[값1, 값2]) — 리스트 순서로 매칭된다",
+      "Command(resume={interrupt1.id: 값1, interrupt2.id: 값2})",
+      "graph.invoke(None, config)를 두 번 호출한다",
+      "병렬 노드에서는 interrupt를 쓸 수 없다"
+    ],
+    "answer": 1,
+    "explain": "여러 interrupt가 동시에 대기 중이면 interrupt id를 키로 하는 딕셔너리로 각각의 값을 지정합니다. 일부만 답하면 나머지는 계속 대기합니다."
+  },
+  {
+    "q": "HumanInTheLoopMiddleware(interrupt_on={\"send_email\": True, \"search\": False})에 대한 설명으로 옳은 것은?",
+    "options": [
+      "send_email은 approve/edit/reject/respond 결정을 모두 허용하며 실행 전에 멈추고, search는 승인 없이 실행된다",
+      "send_email은 자동 실행되고 search만 승인을 받는다",
+      "interrupt_on에 없는 도구는 실행이 금지된다",
+      "체크포인터 없이도 동작한다"
+    ],
+    "answer": 0,
+    "explain": "True는 네 가지 결정을 모두 허용하는 승인 대상, False와 미등록 도구는 자동 승인입니다. interrupt를 쓰므로 체크포인터가 필요합니다."
+  },
+  {
+    "q": "interrupt_mode=\"batched\"와 \"per_call\"의 차이로 옳은 것은?",
+    "options": [
+      "batched는 한 모델 턴의 승인 대상 호출을 interrupt 하나로 모아 {\"decisions\": [...]}로 답하고, per_call은 호출마다 interrupt를 걸어 interrupt id별로 결정 하나씩 답한다",
+      "batched는 도구를 병렬 실행하고 per_call은 순차 실행한다",
+      "per_call은 reject 결정을 지원하지 않는다",
+      "두 모드는 이름만 다르고 동작은 같다"
+    ],
+    "answer": 0,
+    "explain": "batched는 HITLRequest(action_requests 목록) 하나를 보내고 decisions 리스트를 순서대로 받습니다. per_call은 ToolApprovalRequest를 호출마다 보내며 response_schema로 답을 검증합니다."
+  }
+]

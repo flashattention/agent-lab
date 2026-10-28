@@ -1,0 +1,32 @@
+[
+  {
+    "q": "노드가 Command(update={\"decision\": \"hold\"}, goto=\"manual_review\")를 반환하면 일어나는 일은?",
+    "options": ["decision만 기록되고 이동은 무시된다", "decision이 상태에 반영되고 다음에 manual_review가 실행된다", "manual_review만 실행되고 update는 무시된다", "에러가 난다. 노드는 dict만 반환할 수 있다"],
+    "answer": 1,
+    "explain": "Command는 상태 업데이트(update, 리듀서 적용)와 이동(goto)을 한 번에 지정합니다."
+  },
+  {
+    "q": "노드 router에 add_edge(\"router\", \"audit\")가 있고, router가 Command(goto=\"approve\")를 반환하면?",
+    "options": ["approve만 실행된다", "audit만 실행된다", "approve와 audit가 모두 실행된다", "컴파일 에러"],
+    "answer": 2,
+    "explain": "Command의 goto는 정적 엣지를 대체하지 않고 추가됩니다. 그래서 Command로 라우팅하는 노드에는 보통 정적 엣지를 걸지 않습니다."
+  },
+  {
+    "q": "Send(\"research\", {\"topic\": t})에 대한 설명으로 옳은 것은?",
+    "options": ["research 노드가 전체 그래프 상태를 받는다", "research 노드가 {\"topic\": t}를 입력으로 받아 실행되며, 여러 Send는 같은 스텝에서 병렬 실행된다", "Send는 순차적으로 하나씩 실행된다", "Send는 컴파일 시점에 개수가 고정되어야 한다"],
+    "answer": 1,
+    "explain": "Send의 두 번째 인자가 그 노드 실행의 입력입니다. 개수는 실행 시점에 정해지며, 같은 슈퍼스텝에서 병렬로 실행됩니다."
+  },
+  {
+    "q": "Send로 N개의 병렬 작업이 같은 키 notes에 결과를 쓸 때 반드시 필요한 것은?",
+    "options": ["notes 키에 리듀서(예: operator.add)", "recursion_limit을 N 이상으로 설정", "defer=True", "Command.PARENT"],
+    "answer": 0,
+    "explain": "같은 스텝에서 여러 값이 한 키로 들어오므로 리듀서가 없으면 InvalidUpdateError가 납니다. 리듀서가 reduce 단계 역할을 합니다."
+  },
+  {
+    "q": "길이가 다른 병렬 가지(a→b1→c→agg, a→b2→agg)에서 agg가 두 번 실행되는 문제를 해결하는 방법은?",
+    "options": ["agg를 add_node(..., defer=True)로 등록하거나 add_edge([\"c\", \"b2\"], \"agg\")로 합류시킨다", "recursion_limit을 낮춘다", "agg에 리듀서를 붙인다", "max_concurrency=1로 설정한다"],
+    "answer": 0,
+    "explain": "defer=True는 실행할 다른 노드가 없을 때까지 집계 노드를 미루고, 합류 엣지는 나열한 노드가 모두 끝난 뒤 실행하게 합니다."
+  }
+]

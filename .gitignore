@@ -1,0 +1,10 @@
+node_modules/
+.next/
+.venv/
+__pycache__/
+*.py[oc]
+.ruff_cache/
+backend/data/
+*.sqlite
+.env
+.DS_Store
