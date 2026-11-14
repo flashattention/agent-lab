@@ -102,6 +102,14 @@ export default async function Home() {
 
       <footer className="border-t border-border px-6 py-8 text-center text-xs leading-relaxed text-muted">
         AgentLab. 코드는 격리된 샌드박스에서 실행되고, OpenAI API Key는 이 브라우저에만 저장됩니다.
+        <div className="mt-2 flex justify-center gap-4">
+          <Link href="/privacy" className="hover:text-fg">
+            개인정보처리방침
+          </Link>
+          <Link href="/terms" className="hover:text-fg">
+            서비스 약관
+          </Link>
+        </div>
       </footer>
     </main>
   );
