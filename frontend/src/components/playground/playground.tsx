@@ -213,6 +213,13 @@ function Workspace() {
     [rf, s],
   );
 
+  // 저장된 캔버스를 복원할 때는 패널 크기가 정해진 뒤에 한 번 더 화면에 맞춘다
+  useEffect(() => {
+    if (!mounted) return;
+    const t = setTimeout(() => usePlayground.getState().nodes.length && rf.fitView({ padding: 0.2 }), 150);
+    return () => clearTimeout(t);
+  }, [mounted, rf]);
+
   // 프로젝트를 새로 열면 화면에 맞춘다
   useEffect(() => {
     if (s.projectId) setTimeout(() => rf.fitView({ padding: 0.2 }), 60);
