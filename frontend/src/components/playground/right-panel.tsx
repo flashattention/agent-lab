@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Info, Settings2, Shapes, SlidersHorizontal, Trash2 } from "lucide-react";
+import type { ReactNode } from "react";
+import { Activity, Info, Loader2, Settings2, Shapes, SlidersHorizontal, Trash2 } from "lucide-react";
 import { KINDS, PALETTE_ORDER, TOOL_LIBRARY } from "@/lib/playground/catalog";
 import type { NodeKind, RouterStrategy } from "@/lib/playground/types";
 import { cn } from "@/lib/utils";
@@ -201,14 +201,31 @@ function GraphSettingsPanel() {
   );
 }
 
-export function RightPanel({ onAdd }: { onAdd: (k: NodeKind) => void }) {
+export type RightTab = "palette" | "props" | "graph" | "trace";
+
+export function RightPanel({
+  onAdd,
+  tab,
+  onTab,
+  trace,
+  traceCount,
+  running,
+}: {
+  onAdd: (k: NodeKind) => void;
+  tab: RightTab;
+  onTab: (t: RightTab) => void;
+  trace: ReactNode;
+  traceCount: number;
+  running: boolean;
+}) {
   const selectedId = usePlayground((s) => s.selectedId);
-  const [tab, setTab] = useState<"palette" | "props" | "graph">("palette");
   const active = selectedId && tab === "palette" ? "props" : tab;
+  const setTab = onTab;
   const tabs = [
     { id: "palette", label: "컴포넌트", icon: Shapes },
     { id: "props", label: "속성", icon: SlidersHorizontal },
     { id: "graph", label: "그래프", icon: Settings2 },
+    { id: "trace", label: "트레이스", icon: Activity },
   ] as const;
   return (
     <div className="flex h-full min-h-0 flex-col bg-surface">
@@ -221,18 +238,23 @@ export function RightPanel({ onAdd }: { onAdd: (k: NodeKind) => void }) {
               if (id === "palette") usePlayground.getState().select(null);
             }}
             className={cn(
-              "flex flex-1 items-center justify-center gap-1.5 border-b-2 text-xs font-medium transition-colors",
+              "flex min-w-0 flex-1 items-center justify-center gap-1 border-b-2 px-1 text-xs font-medium whitespace-nowrap transition-colors",
               active === id ? "border-accent text-fg" : "border-transparent text-muted hover:text-fg",
             )}
           >
-            <I className="h-3.5 w-3.5" />
-            {label}
+            <I className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">{label}</span>
+            {id === "trace" && (running ? <Loader2 className="h-3 w-3 shrink-0 animate-spin text-accent" /> : traceCount > 0 && <span className="rounded-full bg-surface-2 px-1 text-[10px] text-muted">{traceCount}</span>)}
           </button>
         ))}
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {active === "palette" ? <Palette onAdd={onAdd} /> : active === "props" ? <Inspector /> : <GraphSettingsPanel />}
-      </div>
+      {active === "trace" ? (
+        <div className="min-h-0 flex-1">{trace}</div>
+      ) : (
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {active === "palette" ? <Palette onAdd={onAdd} /> : active === "props" ? <Inspector /> : <GraphSettingsPanel />}
+        </div>
+      )}
     </div>
   );
 }

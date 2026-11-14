@@ -53,7 +53,7 @@ import { AgentNode, type NodeStatus } from "./agent-node";
 import { Explorer } from "./explorer";
 import { PatternsDialog } from "./patterns-dialog";
 import { ProjectBar } from "./project-bar";
-import { RightPanel } from "./right-panel";
+import { RightPanel, type RightTab } from "./right-panel";
 import { CANVAS_TAB, toGraph, usePlayground } from "./store";
 import { useProjectSync } from "./use-project-sync";
 import { useAuth } from "@/lib/auth";
@@ -82,7 +82,8 @@ function Workspace() {
   const user = useAuth((x) => x.user);
   const needLogin = SUPABASE_ENABLED && !user; // 코드 실행·검증·고도화는 로그인한 사용자만
   const [showPatterns, setShowPatterns] = useState(false);
-  const [bottomTab, setBottomTab] = useState<"problems" | "terminal" | "trace">("problems");
+  const [bottomTab, setBottomTab] = useState<"problems" | "terminal">("problems");
+  const [rightTab, setRightTab] = useState<RightTab>("palette");
   const setNavOpen = useNavOverlay((x) => x.setOpen);
   const [validation, setValidation] = useState<ValidateReport | null>(null);
   const [busy, setBusy] = useState<null | "validate" | "refine">(null);
@@ -146,14 +147,14 @@ function Workspace() {
   const running = runner.status === "running";
   const traceTree = useMemo(() => buildTrace(runner.trace, running), [runner.trace, running]);
   const runStates = useMemo(() => nodeStates(traceTree), [traceTree]);
-  // 실행 중 첫 트레이스가 들어오면 트레이스 탭으로 한 번 전환
+  // 실행 중 첫 트레이스가 들어오면 오른쪽 트레이스 탭으로 한 번 전환
   const traceSwitched = useRef(false);
   useEffect(() => {
     if (!running) return;
     if (!traceTree.order.length) traceSwitched.current = false;
     else if (!traceSwitched.current) {
       traceSwitched.current = true;
-      setBottomTab("trace");
+      setRightTab("trace");
     }
   }, [running, traceTree.order.length]);
 
@@ -220,11 +221,17 @@ function Workspace() {
   /* ------------------------------------------------------------ 액션 */
   const askLogin = () => setNotice({ kind: "login", text: "코드 실행, 검증, 고도화는 로그인 후 사용할 수 있습니다." });
 
-  const run = async () => {
+  // 공유받은 프로젝트에 작성자가 고친 코드가 있으면, 내 키로 실행하기 전에 확인한다
+  const [confirmShared, setConfirmShared] = useState(false);
+  const sharedEdited = sync.state === "viewing" && modified.size > 0;
+
+  const run = async (opts: { confirmed?: boolean; noKey?: boolean } = {}) => {
     if (needLogin) return askLogin();
+    if (sharedEdited && apiKey && !opts.confirmed) return setConfirmShared(true);
+    setConfirmShared(false);
     setBottomTab("terminal");
     setMarkers({});
-    const res = await runner.run(files, "main.py", { timeout: 90 });
+    const res = await runner.run(files, "main.py", { timeout: 90, noKey: opts.noKey });
     if (!res.ok) {
       const loc = parseTraceback(res.stderr, Object.keys(files));
       if (loc) setMarkers({ [loc.file]: [{ line: loc.line, message: loc.message }] });
@@ -292,7 +299,7 @@ function Workspace() {
   // 단축키: 실행 취소/다시 실행, 실행, 저장. 입력 중이거나 코드 편집기 안에서는 편집기 쪽 단축키를 그대로 둔다.
   const runRef = useRef<() => void>(() => {});
   useEffect(() => {
-    runRef.current = run;
+    runRef.current = () => run();
   });
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -396,7 +403,7 @@ function Workspace() {
                   </button>
                 ) : (
                   <button
-                    onClick={run}
+                    onClick={() => run()}
                     disabled={!analysis.ok}
                     className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-accent px-2 py-1.5 text-xs font-semibold text-accent-fg hover:brightness-110 disabled:opacity-40"
                     title={analysis.ok ? "main.py 실행 (Ctrl/⌘+Enter)" : "구조 오류를 먼저 해결하세요"}
@@ -445,18 +452,17 @@ function Workspace() {
               <SplitPanel defaultSize="62" minSize="15">
                 <div className="flex h-full min-h-0 flex-col">
                   <div className="flex h-8 shrink-0 items-stretch border-b border-border bg-surface text-xs">
-                    {(["problems", "terminal", "trace"] as const).map((t) => (
+                    {(["problems", "terminal"] as const).map((t) => (
                       <button
                         key={t}
                         onClick={() => setBottomTab(t)}
                         className={cn("flex items-center gap-1.5 border-b-2 px-3", bottomTab === t ? "border-accent text-fg" : "border-transparent text-muted hover:text-fg")}
                       >
-                        {t === "problems" ? "문제" : t === "terminal" ? "터미널" : "트레이스"}
+                        {t === "problems" ? "문제" : "터미널"}
                         {t === "problems" && (errors.length + warnings.length > 0) && (
                           <span className={cn("rounded-full px-1.5 text-[10px] font-bold text-white", errors.length ? "bg-danger" : "bg-warning")}>{errors.length + warnings.length}</span>
                         )}
-                        {t === "trace" && traceTree.order.length > 0 && <span className="rounded-full bg-surface-2 px-1.5 text-[10px] text-muted">{traceTree.order.length}</span>}
-                        {t !== "problems" && runner.status === "running" && bottomTab === t && <Loader2 className="h-3 w-3 animate-spin text-accent" />}
+                        {t === "terminal" && running && <Loader2 className="h-3 w-3 animate-spin text-accent" />}
                       </button>
                     ))}
                   </div>
@@ -475,8 +481,6 @@ function Workspace() {
                           setTimeout(() => setReveal({ line, nonce: Date.now() }), 60);
                         }}
                       />
-                    ) : bottomTab === "trace" ? (
-                      <TracePanel events={runner.trace} live={runner.status === "running"} />
                     ) : (
                       <ProblemsPanel analysis={analysis} validation={validation} refinedNotes={refinedValid?.notes} onFocus={focusNodes} />
                     )}
@@ -489,7 +493,7 @@ function Workspace() {
         <SplitHandle />
 
         {/* 가운데: 탭 (캔버스 + 파일) — 화면 높이 전체 */}
-        <SplitPanel defaultSize="55" minSize="30">
+        <SplitPanel defaultSize="53" minSize="30">
           <div className="flex h-full min-h-0 flex-col">
             <div className="flex h-9 shrink-0 items-stretch overflow-x-auto border-b border-border bg-surface-2/60">
               {s.tabs.map((t) => (
@@ -584,7 +588,7 @@ function Workspace() {
                     value={files[activeFile]}
                     onChange={(v) => s.setOverride(activeFile, v)}
                     markers={markers[activeFile]}
-                    onRun={run}
+                    onRun={() => run()}
                     revealLine={reveal}
                   />
                 </div>
@@ -611,11 +615,57 @@ function Workspace() {
         </SplitPanel>
         <SplitHandle />
 
-        {/* 오른쪽: 컴포넌트/속성 */}
-        <SplitPanel defaultSize="20" minSize="14">
-          <RightPanel onAdd={(k) => addAt(k)} />
+        {/* 오른쪽: 컴포넌트 / 속성 / 그래프 / 트레이스 */}
+        <SplitPanel defaultSize="22" minSize="14">
+          <RightPanel
+            onAdd={(k) => addAt(k)}
+            tab={rightTab}
+            onTab={setRightTab}
+            running={running}
+            traceCount={traceTree.order.length}
+            trace={<TracePanel events={runner.trace} live={running} />}
+          />
         </SplitPanel>
       </SplitGroup>
+
+      {confirmShared && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" onMouseDown={(e) => e.target === e.currentTarget && setConfirmShared(false)}>
+          <div role="dialog" aria-modal="true" aria-label="공유 프로젝트 실행 확인" className="fade-in w-full max-w-md rounded-2xl border border-border bg-surface p-5 shadow-soft">
+            <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
+              <AlertTriangle className="h-4 w-4 text-warning" /> 다른 사람이 수정한 코드가 들어 있습니다
+            </div>
+            <p className="text-[12.5px] leading-relaxed text-fg-2">
+              이 공유 프로젝트에는 작성자가 직접 고친 파일이 있습니다. API 키 문자열은 실행 코드에 전달되지 않지만, 코드가 실행되는 동안 <b>내 키로 OpenAI를 호출해 비용을 발생시킬 수는 있습니다.</b>{" "}
+              먼저 코드를 확인하거나 Mock 모드로 실행해 보세요.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1">
+              {[...modified].map((f) => (
+                <button
+                  key={f}
+                  onClick={() => {
+                    s.openTab(f);
+                    setConfirmShared(false);
+                  }}
+                  className="rounded-md bg-surface-2 px-1.5 py-0.5 font-mono text-[11px] text-fg-2 hover:text-accent"
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button onClick={() => setConfirmShared(false)} className="rounded-lg px-3 py-1.5 text-xs text-muted hover:bg-surface-2 hover:text-fg">
+                취소
+              </button>
+              <button onClick={() => run({ confirmed: true })} className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-surface-2">
+                내 키로 실행
+              </button>
+              <button onClick={() => run({ confirmed: true, noKey: true })} className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-accent-fg hover:brightness-110">
+                Mock 모드로 실행
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <PatternsDialog
         open={showPatterns}

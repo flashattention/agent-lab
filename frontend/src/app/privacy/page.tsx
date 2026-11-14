@@ -30,7 +30,7 @@ export default function PrivacyPage() {
         <ul>
           <li>
             <strong>OpenAI API 키:</strong> 이 브라우저(localStorage)에만 저장됩니다. 코드를 실행할 때만 서버로 전달되며, 서버는 키를 저장하거나
-            기록하지 않습니다.
+            기록하지 않습니다. 실행되는 코드에는 키가 전달되지 않고, 서버의 키 프록시가 OpenAI 추론 API 요청에만 키를 붙여 전달합니다.
           </li>
           <li>
             <strong>실행한 코드와 결과:</strong> 실행 요청을 처리하는 동안에만 서버 메모리에 머물고 저장되지 않습니다. 단, &ldquo;고도화&rdquo;

@@ -58,7 +58,7 @@ export function useRunner() {
       return [...prev, { kind, text }];
     });
 
-  const run = useCallback(async (files: Record<string, string>, entry: string, opts: { timeout?: number } = {}) => {
+  const run = useCallback(async (files: Record<string, string>, entry: string, opts: { timeout?: number; noKey?: boolean } = {}) => {
     abortRef.current?.abort();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
@@ -88,7 +88,7 @@ export function useRunner() {
             push(e.code === 0 ? "success" : "error", `\n${e.code === 0 ? "✓" : "✗"} 종료 코드 ${e.code} · ${(e.duration_ms / 1000).toFixed(2)}s\n`);
           } else if (e.type === "error") push("error", e.message + "\n");
         },
-        { signal: ctrl.signal, timeout: opts.timeout },
+        { signal: ctrl.signal, timeout: opts.timeout, noKey: opts.noKey },
       );
     } catch (e) {
       if ((e as Error).name === "AbortError") {

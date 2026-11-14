@@ -18,9 +18,12 @@ import signal
 import sys
 import tempfile
 import time
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import AsyncIterator
+
+from .keyproxy import proxied_key
 
 SANDBOX_DIR = Path(__file__).resolve().parent.parent / "sandbox"
 MAX_OUTPUT = int(os.getenv("AGENTLAB_MAX_OUTPUT", 200_000))
@@ -72,7 +75,17 @@ def _preexec(timeout: int):
     return fn
 
 
-def _build_env(workdir: Path, api_key: str | None, model: str | None) -> tuple[dict, bool]:
+@asynccontextmanager
+async def _key_env(api_key: str | None):
+    """진짜 키 대신 키 주입 프록시 주소와 가짜 키를 샌드박스 환경변수로 준다 (keyproxy 참고)."""
+    if not api_key:
+        yield {}
+        return
+    async with proxied_key(api_key) as (base_url, dummy):
+        yield {"OPENAI_API_KEY": dummy, "OPENAI_BASE_URL": base_url, "OPENAI_API_BASE": base_url}
+
+
+def _build_env(workdir: Path, api_key: str | None, model: str | None, key_env: dict) -> tuple[dict, bool]:
     mock = not api_key
     env = {
         "PATH": os.path.dirname(sys.executable) + ":/usr/bin:/bin",
@@ -91,7 +104,7 @@ def _build_env(workdir: Path, api_key: str | None, model: str | None) -> tuple[d
     if mock:
         env["AGENTLAB_MOCK"] = "1"
     else:
-        env["OPENAI_API_KEY"] = api_key  # type: ignore[assignment]
+        env.update(key_env)  # 진짜 키는 넘기지 않는다
     return env, mock
 
 
@@ -117,14 +130,14 @@ async def stream_run(
         raise RunError(f"엔트리 파일 {entry} 이(가) 없습니다.")
     timeout = max(1, min(int(timeout), MAX_TIMEOUT))
 
-    async with _semaphore:
+    async with _semaphore, _key_env(api_key) as key_env:
         workdir = Path(tempfile.mkdtemp(prefix="agentlab-")).resolve()
         try:
             for rel, content in files.items():
                 p = _safe_path(workdir, rel)
                 p.parent.mkdir(parents=True, exist_ok=True)
                 p.write_text(content, encoding="utf-8")
-            env, mock = _build_env(workdir, api_key, model)
+            env, mock = _build_env(workdir, api_key, model, key_env)
             trace_r, trace_w = os.pipe()
             env["AGENTLAB_TRACE_FD"] = str(trace_w)
             yield {"type": "start", "mock": mock, "entry": entry}
