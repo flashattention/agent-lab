@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "./auth";
 import { useSettings } from "./settings";
 
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/$/, "");
@@ -12,7 +13,12 @@ export type RunEvent =
 
 function headers(): HeadersInit {
   const { apiKey } = useSettings.getState();
-  return { "content-type": "application/json", ...(apiKey ? { "x-openai-key": apiKey } : {}) };
+  const { token } = useAuth.getState();
+  return {
+    "content-type": "application/json",
+    ...(apiKey ? { "x-openai-key": apiKey } : {}),
+    ...(token ? { authorization: `Bearer ${token}` } : {}),
+  };
 }
 
 async function errorText(res: Response) {
@@ -111,7 +117,7 @@ export async function listModels(): Promise<string[]> {
   return (await res.json()).models;
 }
 
-export async function health(): Promise<{ ok: boolean; versions: Record<string, string>; python: string } | null> {
+export async function health(): Promise<{ ok: boolean; versions: Record<string, string>; python: string; auth_required?: boolean } | null> {
   try {
     const res = await fetch(`${API_URL}/api/health`);
     return res.ok ? res.json() : null;

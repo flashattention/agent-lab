@@ -4,48 +4,48 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --bg: #fafafa;
+  --bg: #f6f7f9;
   --surface: #ffffff;
-  --surface-2: #f4f4f5;
-  --surface-3: #e9e9ec;
-  --border: #e4e4e7;
-  --border-strong: #d4d4d8;
-  --fg: #18181b;
-  --fg-2: #3f3f46;
-  --muted: #71717a;
-  --accent: #6d28d9;
-  --accent-2: #2563eb;
-  --accent-soft: #ede9fe;
+  --surface-2: #eef0f4;
+  --surface-3: #e3e6ec;
+  --border: #dfe2e8;
+  --border-strong: #c5cad4;
+  --fg: #12151c;
+  --fg-2: #363c49;
+  --muted: #687080;
+  --accent: #2747e8;
+  --accent-2: #0d9488;
+  --accent-soft: #e6ebff;
   --accent-fg: #ffffff;
   --success: #059669;
   --warning: #d97706;
   --danger: #dc2626;
   --danger-soft: #fee2e2;
-  --code-bg: #f6f6f8;
-  --grid: #e4e4e7;
+  --code-bg: #f1f3f7;
+  --grid: #d9dde5;
   --shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 4px 16px rgb(0 0 0 / 0.04);
 }
 
 .dark {
-  --bg: #09090b;
-  --surface: #111114;
-  --surface-2: #18181c;
-  --surface-3: #232329;
-  --border: #26262c;
-  --border-strong: #3a3a42;
-  --fg: #f4f4f5;
-  --fg-2: #d4d4d8;
-  --muted: #a1a1aa;
-  --accent: #a78bfa;
-  --accent-2: #60a5fa;
-  --accent-soft: #2e1f5e;
-  --accent-fg: #0b0b0f;
+  --bg: #0d1017;
+  --surface: #141821;
+  --surface-2: #1b202b;
+  --surface-3: #262c39;
+  --border: #272d3a;
+  --border-strong: #3b4354;
+  --fg: #eef0f5;
+  --fg-2: #cdd2dc;
+  --muted: #98a0b0;
+  --accent: #8ea5ff;
+  --accent-2: #4fd1c5;
+  --accent-soft: #1c2650;
+  --accent-fg: #0b0e16;
   --success: #34d399;
   --warning: #fbbf24;
   --danger: #f87171;
   --danger-soft: #3b1515;
-  --code-bg: #0e0e12;
-  --grid: #1f1f25;
+  --code-bg: #10141c;
+  --grid: #222835;
   --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.35);
 }
 
@@ -80,6 +80,8 @@ body {
 }
 
 body {
+  word-break: keep-all; /* 한국어는 단어 중간에서 줄을 바꾸지 않는다 */
+  overflow-wrap: anywhere;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
@@ -151,19 +153,19 @@ body {
 .prose img { border-radius: 12px; }
 
 /* ---------------------------------------------------------------- highlight.js (theme-aware) */
-.hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-name { color: #7c3aed; }
+.hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-name { color: #2747e8; }
 .hljs-string, .hljs-attr-value, .hljs-template-string { color: #059669; }
 .hljs-number, .hljs-literal { color: #d97706; }
 .hljs-comment, .hljs-quote { color: #8a8a95; font-style: italic; }
-.hljs-title, .hljs-title.function_, .hljs-section { color: #2563eb; }
+.hljs-title, .hljs-title.function_, .hljs-section { color: #0d7f76; }
 .hljs-attr, .hljs-variable, .hljs-params { color: #be185d; }
 .hljs-meta, .hljs-decorator { color: #0891b2; }
 .hljs-type, .hljs-class { color: #b45309; }
-.dark .hljs-keyword, .dark .hljs-selector-tag, .dark .hljs-built_in, .dark .hljs-name { color: #c4b5fd; }
+.dark .hljs-keyword, .dark .hljs-selector-tag, .dark .hljs-built_in, .dark .hljs-name { color: #a9baff; }
 .dark .hljs-string, .dark .hljs-attr-value, .dark .hljs-template-string { color: #6ee7b7; }
 .dark .hljs-number, .dark .hljs-literal { color: #fcd34d; }
 .dark .hljs-comment, .dark .hljs-quote { color: #6b6b78; }
-.dark .hljs-title, .dark .hljs-title.function_, .dark .hljs-section { color: #93c5fd; }
+.dark .hljs-title, .dark .hljs-title.function_, .dark .hljs-section { color: #6fdccf; }
 .dark .hljs-attr, .dark .hljs-variable, .dark .hljs-params { color: #f9a8d4; }
 .dark .hljs-meta, .dark .hljs-decorator { color: #67e8f9; }
 .dark .hljs-type, .dark .hljs-class { color: #fdba74; }
@@ -190,3 +192,11 @@ body {
 
 @keyframes fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 .fade-in { animation: fade-in 0.25s ease-out both; }
+
+/* ---------------------------------------------------------------- 첫 화면 */
+.hero-wire { stroke-dasharray: 6 5; animation: wire 1.4s linear infinite; }
+@keyframes wire { to { stroke-dashoffset: -22; } }
+@media (prefers-reduced-motion: reduce) {
+  .hero-wire, .fade-in, .pulse-danger { animation: none; }
+}
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

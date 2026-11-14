@@ -25,6 +25,14 @@ type PlaygroundState = {
   tabs: string[];
   activeTab: string;
   patternId: string | null;
+  // 프로젝트 (로그인 후 서버에 저장되는 작업). projectId 가 없으면 이 브라우저에만 있는 임시 캔버스다.
+  projectId: string | null;
+  projectName: string;
+  owned: boolean; // 내 프로젝트인지. 공유받은 프로젝트는 false (수정해도 저장되지 않음)
+  isPublic: boolean;
+  // 실행 취소
+  past: Snapshot[];
+  future: Snapshot[];
 
   onNodesChange: (c: NodeChange<FlowNode>[]) => void;
   onEdgesChange: (c: EdgeChange[]) => void;
@@ -44,7 +52,21 @@ type PlaygroundState = {
   openTab: (path: string) => void;
   closeTab: (path: string) => void;
   setActiveTab: (path: string) => void;
+  openProject: (p: { id: string; name: string; graph: Graph; overrides: Record<string, string>; pattern_id: string | null; is_public: boolean }, owned: boolean) => void;
+  attachProject: (p: { id: string; name: string; is_public: boolean }) => void;
+  leaveProject: () => void;
+  setProjectName: (name: string) => void;
+  setIsPublic: (v: boolean) => void;
+  undo: () => void;
+  redo: () => void;
 };
+
+type Snapshot = { nodes: FlowNode[]; edges: Edge[]; settings: GraphSettings };
+
+const HISTORY_LIMIT = 60;
+const SCRATCH_KEY = "agentlab-scratch";
+let lastEditAt = 0; // 속성 입력처럼 연속된 수정은 한 단계로 묶는다
+let dragging = false;
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 
@@ -92,6 +114,12 @@ export function toGraph(s: Pick<PlaygroundState, "nodes" | "edges" | "settings">
   };
 }
 
+/** 좌표가 없는 그래프(패턴 예시)를 위→아래로 배치해 돌려준다. */
+export function arranged(g: Graph): Graph {
+  const { nodes, edges } = fromGraph(g);
+  return toGraph({ nodes: layout(nodes, edges), edges, settings: g.settings });
+}
+
 function fromGraph(g: Graph): { nodes: FlowNode[]; edges: Edge[] } {
   const nodes: FlowNode[] = g.nodes.map((n) => ({ id: n.id, type: "agent", position: n.position, data: { ...n.data, kind: n.kind } }));
   const edges: Edge[] = g.edges.map((e) => ({ id: e.id, source: e.source, target: e.target, sourceHandle: e.sourceHandle ?? undefined }));
@@ -100,7 +128,13 @@ function fromGraph(g: Graph): { nodes: FlowNode[]; edges: Edge[] } {
 
 export const usePlayground = create<PlaygroundState>()(
   persist(
-    (set, get) => ({
+    (set, get) => {
+      /** 변경 직전 상태를 실행 취소 기록에 남긴다. */
+      const remember = () => {
+        const { nodes, edges, settings, past } = get();
+        set({ past: [...past.slice(-(HISTORY_LIMIT - 1)), { nodes, edges, settings }], future: [] });
+      };
+      return {
       nodes: [],
       edges: [],
       settings: DEFAULT_SETTINGS,
@@ -111,9 +145,23 @@ export const usePlayground = create<PlaygroundState>()(
       tabs: [CANVAS_TAB],
       activeTab: CANVAS_TAB,
       patternId: null,
+      projectId: null,
+      projectName: "제목 없는 프로젝트",
+      owned: false,
+      isPublic: false,
+      past: [],
+      future: [],
 
-      onNodesChange: (changes) => set({ nodes: applyNodeChanges(changes, get().nodes) }),
-      onEdgesChange: (changes) => set({ edges: applyEdgeChanges(changes, get().edges) }),
+      onNodesChange: (changes) => {
+        const dragStart = !dragging && changes.some((c) => c.type === "position" && c.dragging);
+        if (changes.some((c) => c.type === "position")) dragging = changes.some((c) => c.type === "position" && c.dragging);
+        if (dragStart || changes.some((c) => c.type === "remove")) remember();
+        set({ nodes: applyNodeChanges(changes, get().nodes) });
+      },
+      onEdgesChange: (changes) => {
+        if (changes.some((c) => c.type === "remove")) remember();
+        set({ edges: applyEdgeChanges(changes, get().edges) });
+      },
       onConnect: (c) => {
         if (!c.source || !c.target) return;
         const { nodes, edges } = get();
@@ -122,6 +170,7 @@ export const usePlayground = create<PlaygroundState>()(
         let next = edges;
         if (src && (src.data.kind === "evaluator" || src.data.kind === "human") && c.sourceHandle)
           next = edges.filter((e) => !(e.source === c.source && e.sourceHandle === c.sourceHandle));
+        remember();
         set({ edges: addEdge({ ...c, id: `e-${uid()}` }, next) });
       },
       addNode: (kind, position) => {
@@ -131,19 +180,31 @@ export const usePlayground = create<PlaygroundState>()(
         const id = kind === "start" || kind === "end" ? kind : `${kind}-${uid()}`;
         if (kind !== "start" && kind !== "end") data.name = uniqueName(data.name, nodes);
         const node: FlowNode = { id, type: "agent", position, data: { ...data, kind } };
+        remember();
         set({ nodes: [...nodes, node], selectedId: id });
       },
-      updateNode: (id, patch) => set({ nodes: get().nodes.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...patch } } : n)) }),
-      removeNode: (id) =>
+      updateNode: (id, patch) => {
+        if (Date.now() - lastEditAt > 1000) remember();
+        lastEditAt = Date.now();
+        set({ nodes: get().nodes.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...patch } } : n)) });
+      },
+      removeNode: (id) => {
+        remember();
         set({
           nodes: get().nodes.filter((n) => n.id !== id),
           edges: get().edges.filter((e) => e.source !== id && e.target !== id),
           selectedId: get().selectedId === id ? null : get().selectedId,
-        }),
-      setSettings: (patch) => set({ settings: { ...get().settings, ...patch } }),
+        });
+      },
+      setSettings: (patch) => {
+        if (Date.now() - lastEditAt > 1000) remember();
+        lastEditAt = Date.now();
+        set({ settings: { ...get().settings, ...patch } });
+      },
       select: (id) => set({ selectedId: id }),
       loadGraph: (g, patternId = null) => {
         const { nodes, edges } = fromGraph(g);
+        remember();
         set({
           nodes: layout(nodes, edges),
           edges,
@@ -156,9 +217,14 @@ export const usePlayground = create<PlaygroundState>()(
           activeTab: CANVAS_TAB,
         });
       },
-      clear: () =>
-        set({ nodes: [], edges: [], selectedId: null, overrides: {}, refined: null, patternId: null, tabs: [CANVAS_TAB], activeTab: CANVAS_TAB }),
-      autoLayout: () => set({ nodes: layout(get().nodes, get().edges) }),
+      clear: () => {
+        remember();
+        set({ nodes: [], edges: [], selectedId: null, overrides: {}, refined: null, patternId: null, tabs: [CANVAS_TAB], activeTab: CANVAS_TAB });
+      },
+      autoLayout: () => {
+        remember();
+        set({ nodes: layout(get().nodes, get().edges) });
+      },
       setOverride: (path, content) => {
         const o = { ...get().overrides };
         if (content === null) delete o[path];
@@ -174,10 +240,77 @@ export const usePlayground = create<PlaygroundState>()(
         set({ tabs, activeTab: get().activeTab === path ? tabs[tabs.length - 1] ?? CANVAS_TAB : get().activeTab });
       },
       setActiveTab: (activeTab) => set({ activeTab }),
-    }),
+
+      openProject: (p, owned) => {
+        const cur = get();
+        // 저장되지 않은 임시 캔버스는 따로 보관해 두었다가 프로젝트에서 나올 때 되돌린다
+        if (!cur.projectId && cur.nodes.length) {
+          try {
+            localStorage.setItem(SCRATCH_KEY, JSON.stringify({ graph: toGraph(cur), overrides: cur.overrides, patternId: cur.patternId }));
+          } catch {}
+        }
+        const { nodes, edges } = fromGraph(p.graph);
+        set({
+          nodes,
+          edges,
+          settings: { ...DEFAULT_SETTINGS, ...p.graph.settings },
+          overrides: p.overrides ?? {},
+          patternId: p.pattern_id,
+          projectId: p.id,
+          projectName: p.name,
+          owned,
+          isPublic: p.is_public,
+          selectedId: null,
+          refined: null,
+          tabs: [CANVAS_TAB],
+          activeTab: CANVAS_TAB,
+          past: [],
+          future: [],
+        });
+      },
+      attachProject: (p) => set({ projectId: p.id, projectName: p.name, owned: true, isPublic: p.is_public }),
+      leaveProject: () => {
+        let scratch: { graph: Graph; overrides: Record<string, string>; patternId: string | null } | null = null;
+        try {
+          scratch = JSON.parse(localStorage.getItem(SCRATCH_KEY) || "null");
+          localStorage.removeItem(SCRATCH_KEY);
+        } catch {}
+        const base = { projectId: null, projectName: "제목 없는 프로젝트", owned: false, isPublic: false, selectedId: null, refined: null, tabs: [CANVAS_TAB], activeTab: CANVAS_TAB, past: [], future: [] };
+        if (scratch?.graph) {
+          const { nodes, edges } = fromGraph(scratch.graph);
+          set({ ...base, nodes, edges, settings: scratch.graph.settings, overrides: scratch.overrides ?? {}, patternId: scratch.patternId });
+        } else set({ ...base, nodes: [], edges: [], settings: DEFAULT_SETTINGS, overrides: {}, patternId: null });
+      },
+      setProjectName: (projectName) => set({ projectName }),
+      setIsPublic: (isPublic) => set({ isPublic }),
+
+      undo: () => {
+        const { past, future, nodes, edges, settings } = get();
+        const prev = past[past.length - 1];
+        if (!prev) return;
+        set({ ...prev, past: past.slice(0, -1), future: [{ nodes, edges, settings }, ...future].slice(0, HISTORY_LIMIT), selectedId: null });
+      },
+      redo: () => {
+        const { past, future, nodes, edges, settings } = get();
+        const next = future[0];
+        if (!next) return;
+        set({ ...next, future: future.slice(1), past: [...past, { nodes, edges, settings }].slice(-HISTORY_LIMIT), selectedId: null });
+      },
+      };
+    },
     {
       name: "agentlab-playground",
-      partialize: (s) => ({ nodes: s.nodes, edges: s.edges, settings: s.settings, overrides: s.overrides, patternId: s.patternId }),
+      partialize: (s) => ({
+        nodes: s.nodes,
+        edges: s.edges,
+        settings: s.settings,
+        overrides: s.overrides,
+        patternId: s.patternId,
+        projectId: s.projectId,
+        projectName: s.projectName,
+        owned: s.owned,
+        isPublic: s.isPublic,
+      }),
     },
   ),
 );
