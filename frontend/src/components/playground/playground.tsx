@@ -22,7 +22,6 @@ import {
   LayoutGrid,
   Library,
   Loader2,
-  Menu,
   Network,
   OctagonAlert,
   Play,
@@ -46,7 +45,6 @@ import { CodeEditor, type EditorMarker } from "@/components/ide/code-editor";
 import { ConsolePanel } from "@/components/ide/console-panel";
 import { TracePanel } from "@/components/ide/trace-panel";
 import { buildTrace, nodeStates } from "@/lib/trace";
-import { useNavOverlay } from "@/lib/chrome";
 import { parseTraceback, useRunner } from "@/components/ide/use-runner";
 import { SplitGroup, SplitHandle, SplitPanel } from "@/components/ui/split";
 import { AgentNode, type NodeStatus } from "./agent-node";
@@ -84,7 +82,6 @@ function Workspace() {
   const [showPatterns, setShowPatterns] = useState(false);
   const [bottomTab, setBottomTab] = useState<"problems" | "terminal">("problems");
   const [rightTab, setRightTab] = useState<RightTab>("palette");
-  const setNavOpen = useNavOverlay((x) => x.setOpen);
   const [validation, setValidation] = useState<ValidateReport | null>(null);
   const [busy, setBusy] = useState<null | "validate" | "refine">(null);
   const [notice, setNotice] = useState<{ kind: "ok" | "error" | "info" | "login"; text: string } | null>(null);
@@ -347,22 +344,13 @@ function Workspace() {
   if (!mounted) return <div className="grid flex-1 place-items-center text-sm text-muted">플레이그라운드 로딩 중…</div>;
 
   return (
-    <div className="flex h-dvh min-h-0 flex-col">
+    <div className="flex h-[calc(100dvh-3.5rem)] min-h-0 flex-col">
       <SplitGroup orientation="horizontal" className="min-h-0 flex-1">
         {/* 왼쪽: 툴바 + 파일 탐색기 + 하단 패널(문제/터미널/트레이스) */}
         <SplitPanel defaultSize="25" minSize="16">
           <div className="flex h-full min-h-0 flex-col bg-surface">
             <div className="shrink-0 space-y-1.5 border-b border-border px-2 py-2">
               <div className="flex min-w-0 items-center gap-1">
-                <button
-                  onClick={() => setNavOpen(true)}
-                  title="메뉴 열기 (학습 · Docs · 설정 · 로그인)"
-                  aria-label="메뉴 열기"
-                  className="relative grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-accent text-accent-fg hover:brightness-110"
-                >
-                  <Menu className="h-4 w-4" />
-                  {!apiKey && <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-warning ring-2 ring-surface" />}
-                </button>
                 <div className="min-w-0 flex-1">
                   {SUPABASE_ENABLED ? <ProjectBar sync={sync} /> : <span className="px-1.5 text-sm font-semibold">플레이그라운드</span>}
                 </div>
