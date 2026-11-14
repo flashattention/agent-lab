@@ -2,10 +2,12 @@
 
 AI 에이전트를 그려서 설계하는 작업 공간이자 학습 플랫폼입니다. 그래프를 그리면 실행되는 LangGraph 코드가 만들어지고, Google 로그인으로 프로젝트를 저장하고 링크로 공유합니다. LangChain 1.4와 LangGraph 1.2를 기준으로 합니다.
 
+**배포 주소: <https://agentlab-ai.vercel.app>**
+
 | 공간 | 내용 |
 | --- | --- |
 | **학습** `/learn` | 8개 모듈, 40여 개 강의로 구성됩니다. 왼쪽에는 이론, 오른쪽에는 Monaco IDE가 있어 코드를 실행하고, traceback을 클릭해 오류 위치로 이동하며, 자동 채점 과제를 풀 수 있습니다. 강의마다 퀴즈가 있습니다. |
-| **플레이그라운드** `/playground` | 노드를 드래그해 연결하면 LangGraph 프로젝트(파일 트리)가 실시간으로 생성됩니다. 구조 분석으로 오류는 빨강, 병목과 위험은 노랑으로 표시합니다. 패턴 12종을 제공하고, 실행, 검증, LLM 고도화와 결과 캐싱, ZIP 다운로드를 지원합니다. |
+| **플레이그라운드** `/playground` | 노드를 드래그해 연결하면 LangGraph 프로젝트(파일 트리)가 실시간으로 생성됩니다. 구조 분석으로 오류는 빨강, 병목과 위험은 노랑으로 표시합니다. 패턴 12종을 제공하고, 실행, 검증, LLM 고도화와 결과 캐싱, ZIP 다운로드를 지원합니다. 실행하면 **트레이스** 탭에 노드별 입력 State·업데이트, LLM 메시지·tool_calls·토큰 사용량, 도구 인자·결과가 실시간으로 표시되고 캔버스에서 실행 중인 노드가 강조됩니다(강의 IDE에도 같은 트레이스 탭이 있습니다). |
 | **내 프로젝트** `/projects` | Google 로그인 후 프로젝트를 여러 개 만들고 자동 저장합니다. 공유 링크(`/playground?p=<id>`)를 받은 사람은 보기 전용으로 열고, 자기 작업 공간에 복제해 편집합니다. |
 | **Docs** `/docs` | LangChain, LangGraph, Vector DB, 통합 도구의 한국어 API 레퍼런스입니다. ⌘K로 검색할 수 있습니다. |
 
@@ -24,6 +26,7 @@ backend/    FastAPI · uv · Python 3.13
   app/validate.py    ruff 정적 검사와 Mock 모드 실제 실행 검증
   app/refine.py      고성능 LLM 고도화 → 검증 통과 시 그래프 구조 해시로 SQLite 캐시
   sandbox/           API Key가 없을 때 쓰는 Mock LLM (tool calling, 구조화 출력, 스트리밍 모사)
+                     agentlab_trace.py: LangChain 전역 콜백으로 실행 트레이스를 수집해 별도 파이프로 전달
   scripts/check_content.py   모든 강의 코드를 실제로 실행해 검증
 ```
 

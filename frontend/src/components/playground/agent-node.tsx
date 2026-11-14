@@ -2,13 +2,32 @@
 
 import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { AlertTriangle, OctagonAlert } from "lucide-react";
+import { AlertTriangle, CircleCheck, CircleX, Loader2, OctagonAlert, Pause } from "lucide-react";
 import { KINDS, TOOL_LIBRARY } from "@/lib/playground/catalog";
 import { cn } from "@/lib/utils";
 import { Icon } from "@/components/ui/icon";
 import type { FlowNode } from "./store";
 
 export type NodeStatus = "ok" | "warn" | "error";
+export type NodeRun = { status: "running" | "ok" | "error" | "interrupted" | "aborted"; runs: number };
+
+/** 실행 트레이스 기준 노드 상태 배지 (실행 중 / 완료 횟수 / 오류). */
+function RunBadge({ run }: { run?: NodeRun }) {
+  if (!run) return null;
+  const cls = "absolute -top-2.5 -right-2 z-10 flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold shadow-soft";
+  if (run.status === "running")
+    return (
+      <span className={cn(cls, "border-accent bg-accent text-accent-fg")}>
+        <Loader2 className="h-3 w-3 animate-spin" /> 실행 중
+      </span>
+    );
+  const I = run.status === "error" ? CircleX : run.status === "interrupted" ? Pause : CircleCheck;
+  return (
+    <span className={cn(cls, "bg-surface", run.status === "error" ? "border-danger text-danger" : run.status === "interrupted" ? "border-warning text-warning" : "border-success/50 text-success")}>
+      <I className="h-3 w-3" /> {run.runs > 1 ? `×${run.runs}` : ""}
+    </span>
+  );
+}
 
 const handleCls = "!h-2.5 !w-2.5 !border-2 !bg-surface";
 
@@ -26,6 +45,7 @@ function SourceHandle({ id, label, left, color }: { id: string; label: string; l
 export const AgentNode = memo(function AgentNode({ data, selected }: NodeProps<FlowNode>) {
   const info = KINDS[data.kind];
   const status = (data as FlowNode["data"] & { __status?: NodeStatus }).__status ?? "ok";
+  const run = (data as FlowNode["data"] & { __run?: NodeRun }).__run;
   const color = info.color;
 
   if (data.kind === "start" || data.kind === "end") {
@@ -63,6 +83,7 @@ export const AgentNode = memo(function AgentNode({ data, selected }: NodeProps<F
     <div
       className={cn(
         "relative w-[220px] rounded-2xl border bg-surface shadow-soft transition-[box-shadow,border-color]",
+        run?.status === "running" && "ring-4 ring-accent/40 !border-accent",
         isRouting ? "border-dashed border-2" : "border-border",
         selected && "ring-2 ring-accent/50",
         status === "error" && "pulse-danger !border-danger !border-2 bg-danger-soft",
@@ -71,6 +92,7 @@ export const AgentNode = memo(function AgentNode({ data, selected }: NodeProps<F
       style={isRouting && status === "ok" ? { borderColor: color } : undefined}
     >
       <Handle type="target" position={Position.Top} className={handleCls} />
+      <RunBadge run={run} />
       <div className="flex items-center gap-2.5 px-3 pt-2.5 pb-2">
         <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-white" style={{ background: color }}>
           <Icon name={info.icon} className="h-4 w-4" />

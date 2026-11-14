@@ -2,12 +2,14 @@
 
 import { useAuth } from "./auth";
 import { useSettings } from "./settings";
+import type { TraceEvent } from "./trace";
 
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/$/, "");
 
 export type RunEvent =
   | { type: "start"; mock: boolean; entry: string }
   | { type: "stdout" | "stderr"; data: string }
+  | { type: "trace"; event: TraceEvent }
   | { type: "exit"; code: number; timed_out: boolean; duration_ms: number; mock: boolean }
   | { type: "error"; message: string };
 

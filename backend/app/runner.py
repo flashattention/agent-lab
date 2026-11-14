@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import shutil
 import signal
@@ -25,6 +26,8 @@ SANDBOX_DIR = Path(__file__).resolve().parent.parent / "sandbox"
 MAX_OUTPUT = int(os.getenv("AGENTLAB_MAX_OUTPUT", 200_000))
 MAX_TIMEOUT = int(os.getenv("AGENTLAB_MAX_TIMEOUT", 90))
 MAX_CONCURRENCY = int(os.getenv("AGENTLAB_MAX_CONCURRENCY", 8))
+MAX_TRACE_EVENTS = int(os.getenv("AGENTLAB_MAX_TRACE_EVENTS", 4000))
+MAX_TRACE_LINE = 1_000_000
 MAX_FILES = 64
 MAX_FILE_BYTES = 200_000
 
@@ -101,7 +104,11 @@ async def stream_run(
     timeout: int = 30,
     stdin: str | None = None,
 ) -> AsyncIterator[dict]:
-    """실행 이벤트를 순서대로 yield 한다: start → stdout/stderr* → exit."""
+    """실행 이벤트를 순서대로 yield 한다: start → (stdout | stderr | trace)* → exit.
+
+    trace 이벤트는 샌드박스의 agentlab_trace 가 별도 파이프(AGENTLAB_TRACE_FD)로 보낸
+    LangChain/LangGraph 실행 이벤트다. stdout/stderr 와 섞이지 않는다.
+    """
     if len(files) > MAX_FILES:
         raise RunError("파일이 너무 많습니다.")
     if any(len(c.encode()) > MAX_FILE_BYTES for c in files.values()):
@@ -118,19 +125,33 @@ async def stream_run(
                 p.parent.mkdir(parents=True, exist_ok=True)
                 p.write_text(content, encoding="utf-8")
             env, mock = _build_env(workdir, api_key, model)
+            trace_r, trace_w = os.pipe()
+            env["AGENTLAB_TRACE_FD"] = str(trace_w)
             yield {"type": "start", "mock": mock, "entry": entry}
             started = time.perf_counter()
-            proc = await asyncio.create_subprocess_exec(
-                sys.executable,
-                "-X",
-                "utf8",
-                str(_safe_path(workdir, entry)),
-                cwd=str(workdir),
-                env=env,
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                preexec_fn=_preexec(timeout),
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    sys.executable,
+                    "-X",
+                    "utf8",
+                    str(_safe_path(workdir, entry)),
+                    cwd=str(workdir),
+                    env=env,
+                    stdin=asyncio.subprocess.PIPE,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    pass_fds=(trace_w,),
+                    preexec_fn=_preexec(timeout),
+                )
+            except BaseException:
+                os.close(trace_r)
+                raise
+            finally:
+                os.close(trace_w)  # 쓰기 끝은 자식만 갖는다 → 자식이 끝나면 EOF
+            loop = asyncio.get_running_loop()
+            trace_reader = asyncio.StreamReader(limit=MAX_TRACE_LINE, loop=loop)
+            trace_transport, _ = await loop.connect_read_pipe(
+                lambda: asyncio.StreamReaderProtocol(trace_reader, loop=loop), os.fdopen(trace_r, "rb", 0)
             )
             if stdin:
                 proc.stdin.write(stdin.encode())  # type: ignore[union-attr]
@@ -156,14 +177,35 @@ async def stream_run(
                         await queue.put({"type": "stderr", "data": "\n[AgentLab] 출력이 너무 길어 잘렸습니다.\n"})
                 await queue.put(None)
 
+            async def pump_trace():
+                count = 0
+                while True:
+                    try:
+                        line = await trace_reader.readline()
+                    except (asyncio.LimitOverrunError, ValueError):
+                        continue  # 너무 긴 한 줄은 버린다
+                    if not line:
+                        break
+                    if count >= MAX_TRACE_EVENTS:
+                        continue
+                    try:
+                        ev = json.loads(line)
+                    except ValueError:
+                        continue
+                    count += 1
+                    await queue.put({"type": "trace", "event": ev})
+                await queue.put(None)
+
             tasks = [
                 asyncio.create_task(pump(proc.stdout, "stdout")),  # type: ignore[arg-type]
                 asyncio.create_task(pump(proc.stderr, "stderr")),  # type: ignore[arg-type]
+                asyncio.create_task(pump_trace()),
             ]
+            n_streams = len(tasks)
             done_streams = 0
             timed_out = False
             deadline = started + timeout
-            while done_streams < 2:
+            while done_streams < n_streams:
                 remaining = deadline - time.perf_counter()
                 if remaining <= 0:
                     timed_out = True
@@ -186,6 +228,7 @@ async def stream_run(
             code = await proc.wait()
             for t in tasks:
                 t.cancel()
+            trace_transport.close()
             yield {
                 "type": "exit",
                 "code": code,

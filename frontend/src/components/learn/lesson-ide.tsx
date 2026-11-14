@@ -5,7 +5,7 @@ import { Eye, FileCode2, FlaskConical, KeyRound, Play, RotateCcw, Square, X } fr
 import { cn } from "@/lib/utils";
 import { useProgress, useSettings } from "@/lib/settings";
 import { CodeEditor, type EditorMarker } from "@/components/ide/code-editor";
-import { ConsolePanel } from "@/components/ide/console-panel";
+import { RunPanel } from "@/components/ide/run-panel";
 import { parseTraceback, useRunner } from "@/components/ide/use-runner";
 import { SplitGroup, SplitHandle, SplitPanel } from "@/components/ui/split";
 
@@ -223,13 +223,7 @@ export const LessonIDE = forwardRef<LessonIDEHandle, { lessonId: string; files: 
           </SplitPanel>
           <SplitHandle vertical />
           <SplitPanel defaultSize="36" minSize="10">
-            <ConsolePanel
-              lines={runner.lines}
-              status={runner.status}
-              mock={runner.meta?.mock}
-              onClear={runner.clear}
-              onJump={jump}
-            />
+            <RunPanel runner={runner} onJump={jump} />
           </SplitPanel>
         </SplitGroup>
       </div>

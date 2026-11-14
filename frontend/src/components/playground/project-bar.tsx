@@ -62,7 +62,7 @@ export function ProjectBar({ sync }: { sync: Sync }) {
         onBlur={() => !projectName.trim() && setProjectName("제목 없는 프로젝트")}
         onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
         aria-label="프로젝트 이름"
-        className="w-44 min-w-0 truncate rounded-md border border-transparent bg-transparent px-1.5 py-1 text-sm font-medium outline-none hover:border-border focus:border-accent focus:bg-bg xl:w-60"
+        className="w-full min-w-0 flex-1 truncate rounded-md border border-transparent bg-transparent px-1.5 py-1 text-sm font-medium outline-none hover:border-border focus:border-accent focus:bg-bg"
       />
       <Status state={sync.state} error={sync.error} onRetry={sync.flush} />
       <button onClick={() => setShare(true)} className="flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium hover:bg-surface-2">

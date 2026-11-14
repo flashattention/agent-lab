@@ -4,13 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
-import { BookOpen, Boxes, FileText, FolderOpen, KeyRound, Moon, Settings2, Sun, Workflow } from "lucide-react";
+import { BookOpen, Boxes, FileText, FolderOpen, KeyRound, Moon, Settings2, Sun, Workflow, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/lib/settings";
 import { health } from "@/lib/api";
 import { AuthMenu } from "@/components/auth/auth-menu";
 import { SUPABASE_ENABLED } from "@/lib/supabase";
 import { SettingsDialog } from "./settings-dialog";
+import { isImmersive, useNavOverlay } from "@/lib/chrome";
 
 const LINKS = [
   { href: "/playground", label: "플레이그라운드", icon: Workflow },
@@ -25,6 +26,20 @@ export function Navbar() {
   const [mounted, setMounted] = useState(false);
   const { apiKey, setOpen } = useSettings();
   const [backend, setBackend] = useState<"unknown" | "up" | "down">("unknown");
+  // 플레이그라운드에서는 nav 바를 숨기고, 작업 공간의 버튼으로 잠깐 펼친다
+  const immersive = isImmersive(pathname);
+  const { open: overlayOpen, setOpen: setOverlayOpen } = useNavOverlay();
+
+  useEffect(() => {
+    setOverlayOpen(false);
+  }, [pathname, setOverlayOpen]);
+
+  useEffect(() => {
+    if (!overlayOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOverlayOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [overlayOpen, setOverlayOpen]);
 
   useEffect(() => {
     setMounted(true);
@@ -38,9 +53,17 @@ export function Navbar() {
     };
   }, []);
 
+  if (immersive && !overlayOpen) return <SettingsDialog />;
+
   return (
     <>
-      <header className="sticky top-0 z-40 h-14 shrink-0 border-b border-border bg-bg/80 backdrop-blur-xl">
+      {immersive && <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setOverlayOpen(false)} />}
+      <header
+        className={cn(
+          "top-0 z-40 h-14 shrink-0 border-b border-border bg-bg/80 backdrop-blur-xl",
+          immersive ? "fade-in fixed inset-x-0 z-50 bg-bg/95 shadow-soft" : "sticky",
+        )}
+      >
         <div className="flex h-full items-center gap-2 px-3 sm:gap-6 md:px-6">
           <Link href="/" aria-label="AgentLab 홈" className="flex shrink-0 items-center gap-2 font-semibold tracking-tight">
             <span className="grid h-7 w-7 place-items-center rounded-lg bg-accent text-accent-fg">
@@ -100,6 +123,15 @@ export function Navbar() {
               {mounted && resolvedTheme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
             <AuthMenu />
+            {immersive && (
+              <button
+                aria-label="메뉴 닫기"
+                onClick={() => setOverlayOpen(false)}
+                className="grid h-8 w-8 place-items-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
       </header>
