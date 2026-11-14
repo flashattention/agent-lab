@@ -42,8 +42,12 @@ _hits: dict[tuple[str, str], deque] = defaultdict(deque)
 
 
 def _client_ip(req: Request) -> str:
+    """요청한 클라이언트 IP. X-Forwarded-For 의 맨 앞 값은 클라이언트가 마음대로 넣을 수 있으므로,
+    앞단 프록시(Cloud Run 등)가 덧붙인 맨 끝 값을 쓴다."""
     fwd = req.headers.get("x-forwarded-for")
-    return fwd.split(",")[0].strip() if fwd else (req.client.host if req.client else "?")
+    if fwd:
+        return fwd.split(",")[-1].strip()
+    return req.client.host if req.client else "?"
 
 
 def rate_limit(req: Request, bucket: str) -> None:
@@ -101,9 +105,7 @@ async def run(req: Request, body: RunRequest):
 
     async def gen():
         try:
-            async for ev in stream_run(
-                body.files, body.entry, api_key=api_key, model=body.model, timeout=body.timeout, stdin=body.stdin
-            ):
+            async for ev in stream_run(body.files, body.entry, api_key=api_key, model=body.model, timeout=body.timeout, stdin=body.stdin):
                 yield json.dumps(ev, ensure_ascii=False) + "\n"
         except RunError as e:
             yield json.dumps({"type": "error", "message": str(e)}, ensure_ascii=False) + "\n"
@@ -118,7 +120,7 @@ async def validate_route(req: Request, body: ValidateRequest):
     try:
         return await validate(body.files, body.entry)
     except RunError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
 
 
 @app.post("/api/refine")
@@ -128,9 +130,9 @@ async def refine_route(req: Request, body: RefineRequest):
     try:
         return await refine(body.graph, body.files, _key(req), body.model)
     except RunError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
     except Exception as e:  # OpenAI 오류 등
-        raise HTTPException(502, f"LLM 호출 실패: {type(e).__name__}: {e}")
+        raise HTTPException(502, f"LLM 호출 실패: {type(e).__name__}: {e}") from e
 
 
 @app.post("/api/refine/cached")
@@ -153,9 +155,13 @@ async def models(req: Request):
     try:
         res = await AsyncOpenAI(api_key=api_key).models.list()
     except Exception as e:
-        raise HTTPException(400, f"키 확인 실패: {e}")
+        raise HTTPException(400, f"키 확인 실패: {e}") from e
     ids = sorted(
-        (m.id for m in res.data if m.id.startswith(("gpt-", "o")) and not any(x in m.id for x in ("audio", "realtime", "tts", "transcribe", "image", "search"))),
+        (
+            m.id
+            for m in res.data
+            if m.id.startswith(("gpt-", "o")) and not any(x in m.id for x in ("audio", "realtime", "tts", "transcribe", "image", "search"))
+        ),
         reverse=True,
     )
     return {"models": ids}

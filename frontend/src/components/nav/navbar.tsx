@@ -11,6 +11,7 @@ import { health } from "@/lib/api";
 import { AuthMenu } from "@/components/auth/auth-menu";
 import { SUPABASE_ENABLED } from "@/lib/supabase";
 import { SettingsDialog } from "./settings-dialog";
+import { useMounted } from "@/lib/use-mounted";
 
 const LINKS = [
   { href: "/playground", label: "플레이그라운드", icon: Workflow },
@@ -22,12 +23,11 @@ const LINKS = [
 export function Navbar() {
   const pathname = usePathname();
   const { resolvedTheme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const { apiKey, setOpen } = useSettings();
   const [backend, setBackend] = useState<"unknown" | "up" | "down">("unknown");
 
   useEffect(() => {
-    setMounted(true);
     let alive = true;
     const ping = () => health().then((h) => alive && setBackend(h ? "up" : "down"));
     ping();

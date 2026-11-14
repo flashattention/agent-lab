@@ -27,7 +27,14 @@ async def lint(files: dict[str, str]) -> list[dict]:
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(content, encoding="utf-8")
         proc = await asyncio.create_subprocess_exec(
-            RUFF, "check", "--output-format", "json", "--no-cache", "--select", SELECT, ".",
+            RUFF,
+            "check",
+            "--output-format",
+            "json",
+            "--no-cache",
+            "--select",
+            SELECT,
+            ".",
             cwd=str(workdir),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,

@@ -63,13 +63,12 @@ def structure_key(graph: dict) -> str:
         key=lambda n: n["id"],
     )
     edges = sorted(
-        (
-            {"s": e["source"], "t": e["target"], "h": e.get("sourceHandle"), "l": e.get("label")}
-            for e in graph.get("edges", [])
-        ),
+        ({"s": e["source"], "t": e["target"], "h": e.get("sourceHandle"), "l": e.get("label")} for e in graph.get("edges", [])),
         key=lambda e: (e["s"], e["t"], str(e["h"])),
     )
-    payload = json.dumps({"v": GENERATOR_VERSION, "n": nodes, "e": edges, "s": graph.get("settings", {})}, sort_keys=True, ensure_ascii=False)
+    payload = json.dumps(
+        {"v": GENERATOR_VERSION, "n": nodes, "e": edges, "s": graph.get("settings", {})}, sort_keys=True, ensure_ascii=False
+    )
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
@@ -144,10 +143,8 @@ async def refine(graph: dict, files: dict[str, str], api_key: str | None, model:
         },
     ]
     attempts = []
-    for attempt in range(3):
-        resp = await client.chat.completions.create(
-            model=use_model, messages=messages, response_format={"type": "json_object"}
-        )
+    for _ in range(3):
+        resp = await client.chat.completions.create(model=use_model, messages=messages, response_format={"type": "json_object"})
         content = resp.choices[0].message.content or "{}"
         try:
             data = json.loads(content)

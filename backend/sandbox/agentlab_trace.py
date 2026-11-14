@@ -108,7 +108,9 @@ def _ser(v: Any, depth: int = 0) -> Any:
     # LangGraph Command / Send / Interrupt
     cls = v.__class__.__name__
     if cls in ("Command", "Send", "Interrupt"):
-        fields = {k: getattr(v, k) for k in ("goto", "update", "resume", "graph", "node", "arg", "value") if getattr(v, k, None) is not None}
+        fields = {
+            k: getattr(v, k) for k in ("goto", "update", "resume", "graph", "node", "arg", "value") if getattr(v, k, None) is not None
+        }
         return {"__type__": cls, **{k: _ser(x, depth + 1) for k, x in fields.items()}}
     if hasattr(v, "model_dump"):
         try:
@@ -165,7 +167,7 @@ class AgentLabTracer(BaseCallbackHandler):
 
     run_inline = True  # 비동기 실행에서도 이벤트 순서를 보존한다
     raise_error = False
-    _instance: "AgentLabTracer | None" = None
+    _instance: AgentLabTracer | None = None
 
     def __new__(cls, *a, **kw):
         if cls._instance is None:
@@ -265,26 +267,34 @@ class AgentLabTracer(BaseCallbackHandler):
         meta = self._meta(metadata)
         model = meta.get("ls_model_name") or params.get("model") or params.get("model_name")
         flat = [m for batch in messages for m in batch]
-        _sink.emit({
-            "ev": "start",
-            "id": str(run_id),
-            "parent": parent,
-            "kind": "llm",
-            "name": self._name(serialized, kwargs, "ChatModel"),
-            "meta": meta,
-            "model": model,
-            "tools": tool_names,
-            "tool_choice": _ser(params.get("tool_choice"), 1),
-            "messages": [_msg(m) for m in flat[-MAX_ITEMS:]],
-        })
+        _sink.emit(
+            {
+                "ev": "start",
+                "id": str(run_id),
+                "parent": parent,
+                "kind": "llm",
+                "name": self._name(serialized, kwargs, "ChatModel"),
+                "meta": meta,
+                "model": model,
+                "tools": tool_names,
+                "tool_choice": _ser(params.get("tool_choice"), 1),
+                "messages": [_msg(m) for m in flat[-MAX_ITEMS:]],
+            }
+        )
 
     def on_llm_start(self, serialized, prompts, *, run_id, parent_run_id=None, tags=None, metadata=None, **kwargs):
         parent = self._register(run_id, parent_run_id, False)
-        _sink.emit({
-            "ev": "start", "id": str(run_id), "parent": parent, "kind": "llm",
-            "name": self._name(serialized, kwargs, "LLM"), "meta": self._meta(metadata),
-            "messages": [{"role": "human", "content": _ser(p)} for p in prompts[:MAX_ITEMS]],
-        })
+        _sink.emit(
+            {
+                "ev": "start",
+                "id": str(run_id),
+                "parent": parent,
+                "kind": "llm",
+                "name": self._name(serialized, kwargs, "LLM"),
+                "meta": self._meta(metadata),
+                "messages": [{"role": "human", "content": _ser(p)} for p in prompts[:MAX_ITEMS]],
+            }
+        )
 
     def on_llm_end(self, response, *, run_id, **kwargs):
         message, usage = None, None
@@ -306,11 +316,17 @@ class AgentLabTracer(BaseCallbackHandler):
     # ---- 도구 ----------------------------------------------------------
     def on_tool_start(self, serialized, input_str, *, run_id, parent_run_id=None, tags=None, metadata=None, inputs=None, **kwargs):
         parent = self._register(run_id, parent_run_id, False)
-        _sink.emit({
-            "ev": "start", "id": str(run_id), "parent": parent, "kind": "tool",
-            "name": self._name(serialized, kwargs, "tool"), "meta": self._meta(metadata),
-            "inputs": _ser(inputs if inputs is not None else input_str),
-        })
+        _sink.emit(
+            {
+                "ev": "start",
+                "id": str(run_id),
+                "parent": parent,
+                "kind": "tool",
+                "name": self._name(serialized, kwargs, "tool"),
+                "meta": self._meta(metadata),
+                "inputs": _ser(inputs if inputs is not None else input_str),
+            }
+        )
 
     def on_tool_end(self, output, *, run_id, **kwargs):
         self._end(run_id, outputs=_ser(output))
@@ -321,10 +337,17 @@ class AgentLabTracer(BaseCallbackHandler):
     # ---- 리트리버 -------------------------------------------------------
     def on_retriever_start(self, serialized, query, *, run_id, parent_run_id=None, tags=None, metadata=None, **kwargs):
         parent = self._register(run_id, parent_run_id, False)
-        _sink.emit({
-            "ev": "start", "id": str(run_id), "parent": parent, "kind": "retriever",
-            "name": self._name(serialized, kwargs, "retriever"), "meta": self._meta(metadata), "inputs": _ser(query),
-        })
+        _sink.emit(
+            {
+                "ev": "start",
+                "id": str(run_id),
+                "parent": parent,
+                "kind": "retriever",
+                "name": self._name(serialized, kwargs, "retriever"),
+                "meta": self._meta(metadata),
+                "inputs": _ser(query),
+            }
+        )
 
     def on_retriever_end(self, documents, *, run_id, **kwargs):
         self._end(run_id, outputs=_ser(list(documents)))

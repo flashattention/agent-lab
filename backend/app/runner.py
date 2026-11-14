@@ -18,10 +18,10 @@ import signal
 import sys
 import tempfile
 import time
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import AsyncIterator
 
 from .keyproxy import proxied_key
 
@@ -31,6 +31,7 @@ MAX_TIMEOUT = int(os.getenv("AGENTLAB_MAX_TIMEOUT", 90))
 MAX_CONCURRENCY = int(os.getenv("AGENTLAB_MAX_CONCURRENCY", 8))
 MAX_TRACE_EVENTS = int(os.getenv("AGENTLAB_MAX_TRACE_EVENTS", 4000))
 MAX_TRACE_LINE = 1_000_000
+NPROC_LIMIT = int(os.getenv("AGENTLAB_NPROC_LIMIT", 256))
 MAX_FILES = 64
 MAX_FILE_BYTES = 200_000
 
@@ -67,10 +68,14 @@ def _preexec(timeout: int):
             import resource
 
             resource.setrlimit(resource.RLIMIT_CPU, (timeout + 5, timeout + 5))
-            mem = int(os.getenv("AGENTLAB_MEM_LIMIT_MB", 1024)) * 1024 * 1024
+            # RLIMIT_AS 는 실제 사용량이 아니라 가상 주소 공간을 센다. 스레드 스택(각 8MB 예약)과
+            # chromadb 등의 mmap 때문에 1GB 로는 멀티 에이전트 예제가 스레드를 만들지 못했다.
+            mem = int(os.getenv("AGENTLAB_MEM_LIMIT_MB", 3072)) * 1024 * 1024
             resource.setrlimit(resource.RLIMIT_AS, (mem, mem))
             resource.setrlimit(resource.RLIMIT_FSIZE, (20 * 1024 * 1024, 20 * 1024 * 1024))
-            resource.setrlimit(resource.RLIMIT_NPROC, (256, 256))
+            # RLIMIT_NPROC 은 같은 계정의 모든 프로세스·스레드를 센다. 0 이면 적용하지 않는다(개발 PC·CI 용).
+            if NPROC_LIMIT > 0:
+                resource.setrlimit(resource.RLIMIT_NPROC, (NPROC_LIMIT, NPROC_LIMIT))
 
     return fn
 
@@ -225,7 +230,7 @@ async def stream_run(
                     break
                 try:
                     item = await asyncio.wait_for(queue.get(), timeout=remaining)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     timed_out = True
                     break
                 if item is None:

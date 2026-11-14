@@ -17,7 +17,8 @@ import hashlib
 import json
 import re
 import uuid
-from typing import Any, Iterator, Sequence
+from collections.abc import Iterator, Sequence
+from typing import Any
 
 from langchain_core.callbacks import CallbackManagerForLLMRun
 from langchain_core.embeddings import Embeddings
@@ -155,9 +156,7 @@ def _fake_args(tool: dict, ctx: _Ctx) -> dict:
     params = fn.get("parameters", {}) or {}
     defs = params.get("$defs", params.get("definitions", {}))
     num_iter = iter(ctx.numbers)
-    return {
-        k: _fake_value(v, k, ctx, defs, num_iter) for k, v in params.get("properties", {}).items()
-    }
+    return {k: _fake_value(v, k, ctx, defs, num_iter) for k, v in params.get("properties", {}).items()}
 
 
 def _score_tool(tool: dict, ctx: _Ctx) -> int:

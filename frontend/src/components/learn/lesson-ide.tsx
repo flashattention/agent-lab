@@ -97,7 +97,12 @@ export const LessonIDE = forwardRef<LessonIDEHandle, { lessonId: string; files: 
     const closeTab = (p: string) => {
       const next = open.filter((x) => x !== p);
       setOpen(next);
-      if (p.startsWith("scratch")) setFiles(({ [p]: _, ...rest }) => rest);
+      if (p.startsWith("scratch"))
+        setFiles((f) => {
+          const rest = { ...f };
+          delete rest[p];
+          return rest;
+        });
       if (p === "solution.py") setShowSolution(false);
       if (active === p) setActive(next[0]);
     };

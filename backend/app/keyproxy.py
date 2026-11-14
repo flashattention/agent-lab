@@ -46,8 +46,10 @@ DROP_RESP = {"content-length", "transfer-encoding", "connection", "content-encod
 
 _keys: dict[str, str] = {}
 _port: int | None = None
-_lock = asyncio.Lock()
+_loop: asyncio.AbstractEventLoop | None = None  # 프록시 서버가 도는 이벤트 루프
+_lock: asyncio.Lock | None = None
 _client: httpx.AsyncClient | None = None
+_server_tasks: set[asyncio.Task] = set()  # 서버 태스크가 GC 되지 않도록 참조를 잡아 둔다
 
 
 def _allowed(path: str) -> bool:
@@ -61,7 +63,15 @@ async def _forward(request: Request):
     if not key:
         return JSONResponse({"error": {"message": "AgentLab: 만료되었거나 잘못된 실행 토큰입니다.", "type": "invalid_request_error"}}, 401)
     if not _allowed(path):
-        return JSONResponse({"error": {"message": f"AgentLab: 샌드박스에서 허용하지 않는 OpenAI 엔드포인트입니다 (/{path}).", "type": "invalid_request_error"}}, 403)
+        return JSONResponse(
+            {
+                "error": {
+                    "message": f"AgentLab: 샌드박스에서 허용하지 않는 OpenAI 엔드포인트입니다 (/{path}).",
+                    "type": "invalid_request_error",
+                }
+            },
+            403,
+        )
 
     headers = {k: v for k, v in request.headers.items() if k.lower() not in DROP_REQ}
     headers["authorization"] = f"Bearer {key}"
@@ -76,7 +86,9 @@ async def _forward(request: Request):
     try:
         resp = await _client.send(upstream, stream=True)
     except httpx.HTTPError as e:
-        return JSONResponse({"error": {"message": f"AgentLab: OpenAI 연결 실패 ({e.__class__.__name__})", "type": "api_connection_error"}}, 502)
+        return JSONResponse(
+            {"error": {"message": f"AgentLab: OpenAI 연결 실패 ({e.__class__.__name__})", "type": "api_connection_error"}}, 502
+        )
     out_headers = {k: v for k, v in resp.headers.items() if k.lower() not in DROP_RESP}
     return StreamingResponse(resp.aiter_bytes(), status_code=resp.status_code, headers=out_headers, background=BackgroundTask(resp.aclose))
 
@@ -85,7 +97,11 @@ _app = Starlette(routes=[Route("/{token}/{path:path}", _forward, methods=["GET",
 
 
 async def _ensure_started() -> int:
-    global _port, _client
+    global _port, _client, _loop, _lock
+    loop = asyncio.get_running_loop()
+    if _loop is not loop:  # 이벤트 루프가 바뀌면(테스트, 재시작) 새 루프에서 다시 띄운다
+        _loop, _lock, _port, _client = loop, asyncio.Lock(), None, None
+    assert _lock is not None
     async with _lock:
         if _port is not None:
             return _port
@@ -93,7 +109,7 @@ async def _ensure_started() -> int:
         config = uvicorn.Config(_app, host="127.0.0.1", port=0, log_level="warning", access_log=False, lifespan="off")
         server = uvicorn.Server(config)
         server.install_signal_handlers = lambda: None  # type: ignore[method-assign]
-        asyncio.get_running_loop().create_task(server.serve())
+        _server_tasks.add(loop.create_task(server.serve()))
         for _ in range(200):
             if server.started and server.servers:
                 break

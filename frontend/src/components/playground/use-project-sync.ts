@@ -28,6 +28,13 @@ export function useProjectSync() {
   const loadedFor = useRef<string | null>(null); // 마지막으로 서버에서 불러온 "id:사용자"
   const savedJson = useRef<string>("");
 
+  // 주소에서 프로젝트가 빠지면 임시 캔버스 상태로 (렌더 중 상태 조정)
+  const [prevParam, setPrevParam] = useState(param);
+  if (prevParam !== param) {
+    setPrevParam(param);
+    if (!param) setState("local");
+  }
+
   const payload = () => {
     const s = usePlayground.getState();
     return { name: s.projectName.trim().slice(0, 80) || "제목 없는 프로젝트", graph: toGraph(s), overrides: s.overrides, pattern_id: s.patternId };
@@ -42,7 +49,6 @@ export function useProjectSync() {
       else {
         if (s.projectId) s.leaveProject(); // 공유받아 보던 프로젝트나 로그아웃 전 프로젝트는 닫는다
         loadedFor.current = null;
-        setState("local");
       }
       return;
     }

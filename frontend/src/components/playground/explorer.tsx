@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronRight, FileCode2, FileJson, FileText, Folder, FolderOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -30,24 +30,23 @@ const fileIcon = (name: string) =>
 
 /** 그래프가 바뀔 때 새로 생기거나 내용이 바뀐 파일을 잠깐 강조한다. */
 function useChangedFiles(files: Record<string, string>) {
-  const prev = useRef<Record<string, string> | null>(null);
+  const [prev, setPrev] = useState(files);
   const [flash, setFlash] = useState<Record<string, "new" | "changed">>({});
-  useEffect(() => {
-    if (prev.current) {
-      const f: Record<string, "new" | "changed"> = {};
-      for (const [k, v] of Object.entries(files)) {
-        if (!(k in prev.current)) f[k] = "new";
-        else if (prev.current[k] !== v) f[k] = "changed";
-      }
-      if (Object.keys(f).length) {
-        setFlash(f);
-        const t = setTimeout(() => setFlash({}), 1800);
-        prev.current = files;
-        return () => clearTimeout(t);
-      }
+  // 파일 목록이 바뀐 렌더에서 바로 차이를 계산한다 (렌더 중 상태 조정)
+  if (prev !== files) {
+    const f: Record<string, "new" | "changed"> = {};
+    for (const [k, v] of Object.entries(files)) {
+      if (!(k in prev)) f[k] = "new";
+      else if (prev[k] !== v) f[k] = "changed";
     }
-    prev.current = files;
-  }, [files]);
+    setPrev(files);
+    if (Object.keys(f).length) setFlash(f);
+  }
+  useEffect(() => {
+    if (!Object.keys(flash).length) return;
+    const t = setTimeout(() => setFlash({}), 1800);
+    return () => clearTimeout(t);
+  }, [flash]);
   return flash;
 }
 

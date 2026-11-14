@@ -10,6 +10,7 @@ import { Markdown } from "@/components/markdown/markdown";
 import { SplitGroup, SplitHandle, SplitPanel } from "@/components/ui/split";
 import { LessonIDE, type LessonIDEHandle } from "./lesson-ide";
 import { Quiz } from "./quiz";
+import { useMounted } from "@/lib/use-mounted";
 
 export const LEVEL_STYLE: Record<string, string> = {
   입문: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
@@ -23,9 +24,8 @@ export function LessonView({ lesson, curriculum }: { lesson: Lesson; curriculum:
   const ide = useRef<LessonIDEHandle>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const { done, toggle } = useProgress();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [toc, setToc] = useState(false);
-  useEffect(() => setMounted(true), []);
   useEffect(() => scroller.current?.scrollTo({ top: 0 }), [lesson.id]);
   const isDone = mounted && !!done[lesson.id];
 
