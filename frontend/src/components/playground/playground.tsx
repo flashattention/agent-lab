@@ -11,6 +11,7 @@ import { lookupRefined, refineCode, validateCode, type ValidateReport } from "@/
 import { useSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 import { Canvas } from "./canvas";
+import { MobileNotice } from "./mobile-notice";
 import { toViewEdges, toViewNodes } from "./view-model";
 import { CodeEditor, type EditorMarker } from "@/components/ide/code-editor";
 import { ConsolePanel } from "@/components/ide/console-panel";
@@ -284,6 +285,7 @@ function Workspace() {
 
   return (
     <div className="flex h-[calc(100dvh-3.5rem)] min-h-0 flex-col">
+      <MobileNotice />
       <SplitGroup orientation="horizontal" className="min-h-0 flex-1">
         {/* 왼쪽: 툴바 + 파일 탐색기 + 하단 패널(문제/터미널/트레이스) */}
         <SplitPanel defaultSize="25" minSize="16">

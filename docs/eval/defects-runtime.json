@@ -1,0 +1,723 @@
+{
+  "total": {
+    "crash": 55,
+    "hang": 11,
+    "silent": 31
+  },
+  "by_mutation": {
+    "cut-end": {
+      "crash": 4,
+      "silent": 8
+    },
+    "self-loop": {
+      "hang": 11,
+      "silent": 1
+    },
+    "bad-ident": {
+      "crash": 12
+    },
+    "dup-name": {
+      "crash": 11
+    },
+    "unreachable": {
+      "crash": 12
+    },
+    "no-start": {
+      "crash": 12
+    },
+    "empty-tools": {
+      "crash": 1
+    },
+    "end-out": {
+      "silent": 12
+    },
+    "dangling": {
+      "silent": 10,
+      "crash": 2
+    },
+    "no-checkpointer": {
+      "crash": 1
+    }
+  },
+  "rows": [
+    {
+      "pattern": "react-agent",
+      "mutation": "cut-end",
+      "outcome": "crash",
+      "detail": "During task with name 'assistant' and id 'e264a5c2-0aed-5ac0-5681-962c6552854a'",
+      "ms": 2902
+    },
+    {
+      "pattern": "react-agent",
+      "mutation": "self-loop",
+      "outcome": "hang",
+      "detail": "For troubleshooting, visit: https://docs.langchain.com/oss/python/langgraph/errors/GRAPH_RECURSION_LIMIT",
+      "ms": 3157
+    },
+    {
+      "pattern": "react-agent",
+      "mutation": "bad-ident",
+      "outcome": "crash",
+      "detail": "SyntaxError: invalid syntax",
+      "ms": 2176
+    },
+    {
+      "pattern": "react-agent",
+      "mutation": "dup-name",
+      "outcome": "crash",
+      "detail": "During task with name 'assistant' and id '489dc46a-db26-95d6-a1b0-6520416276b5'",
+      "ms": 5172
+    },
+    {
+      "pattern": "react-agent",
+      "mutation": "unreachable",
+      "outcome": "crash",
+      "detail": "ValueError: Graph must have an entrypoint: add at least one edge from START to another node",
+      "ms": 2791
+    },
+    {
+      "pattern": "react-agent",
+      "mutation": "no-start",
+      "outcome": "crash",
+      "detail": "ValueError: Graph must have an entrypoint: add at least one edge from START to another node",
+      "ms": 2906
+    },
+    {
+      "pattern": "react-agent",
+      "mutation": "empty-tools",
+      "outcome": "crash",
+      "detail": "ModuleNotFoundError: No module named 'agent.tools'",
+      "ms": 2527
+    },
+    {
+      "pattern": "react-agent",
+      "mutation": "end-out",
+      "outcome": "silent",
+      "detail": "[AgentLab] OPENAI_API_KEY 없음 → Mock LLM 모드로 실행합니다.",
+      "ms": 2756
+    },
+    {
+      "pattern": "react-agent",
+      "mutation": "dangling",
+      "outcome": "silent",
+      "detail": "[AgentLab] OPENAI_API_KEY 없음 → Mock LLM 모드로 실행합니다.",
+      "ms": 2769
+    },
+    {
+      "pattern": "prebuilt-agent",
+      "mutation": "cut-end",
+      "outcome": "silent",
+      "detail": "[AgentLab] OPENAI_API_KEY 없음 → Mock LLM 모드로 실행합니다.",
+      "ms": 2799
+    },
+    {
+      "pattern": "prebuilt-agent",
+      "mutation": "self-loop",
+      "outcome": "hang",
+      "detail": "For troubleshooting, visit: https://docs.langchain.com/oss/python/langgraph/errors/GRAPH_RECURSION_LIMIT",
+      "ms": 3130
+    },
+    {
+      "pattern": "prebuilt-agent",
+      "mutation": "bad-ident",
+      "outcome": "crash",
+      "detail": "SyntaxError: invalid syntax",
+      "ms": 1992
+    },
+    {
+      "pattern": "prebuilt-agent",
+      "mutation": "unreachable",
+      "outcome": "crash",
+      "detail": "ValueError: Graph must have an entrypoint: add at least one edge from START to another node",
+      "ms": 2887
+    },
+    {
+      "pattern": "prebuilt-agent",
+      "mutation": "no-start",
+      "outcome": "crash",
+      "detail": "ValueError: Graph must have an entrypoint: add at least one edge from START to another node",
+      "ms": 2775
+    },
+    {
+      "pattern": "prebuilt-agent",
+      "mutation": "end-out",
+      "outcome": "silent",
+      "detail": "[AgentLab] OPENAI_API_KEY 없음 → Mock LLM 모드로 실행합니다.",
+      "ms": 2865
+    },
+    {
+      "pattern": "prebuilt-agent",
+      "mutation": "dangling",
+      "outcome": "silent",
+      "detail": "[AgentLab] OPENAI_API_KEY 없음 → Mock LLM 모드로 실행합니다.",
+      "ms": 2788
+    },
+    {
+      "pattern": "prompt-chaining",
+      "mutation": "cut-end",
+      "outcome": "silent",
+      "detail": "[AgentLab] OPENAI_API_KEY 없음 → Mock LLM 모드로 실행합니다.",
+      "ms": 2868
+    },
+    {
+      "pattern": "prompt-chaining",
+      "mutation": "self-loop",
+      "outcome": "hang",
+      "detail": "For troubleshooting, visit: https://docs.langchain.com/oss/python/langgraph/errors/GRAPH_RECURSION_LIMIT",
+      "ms": 3028
+    },
+    {
+      "pattern": "prompt-chaining",
+      "mutation": "bad-ident",
+      "outcome": "crash",
+      "detail": "SyntaxError: invalid syntax",
+      "ms": 2197
+    },
+    {
+      "pattern": "prompt-chaining",
+      "mutation": "dup-name",
+      "outcome": "crash",
+      "detail": "ValueError: Node `outline` already present.",
+      "ms": 2773
+    },
+    {
+      "pattern": "prompt-chaining",
+      "mutation": "unreachable",
+      "outcome": "crash",
+      "detail": "ValueError: Graph must have an entrypoint: add at least one edge from START to another node",
+      "ms": 2663
+    },
+    {
+      "pattern": "prompt-chaining",
+      "mutation": "no-start",
+      "outcome": "crash",
+      "detail": "ValueError: Graph must have an entrypoint: add at least one edge from START to another node",
+      "ms": 2680
+    },
+    {
+      "pattern": "prompt-chaining",
+      "mutation": "end-out",
+      "outcome": "silent",
+      "detail": "[AgentLab] OPENAI_API_KEY 없음 → Mock LLM 모드로 실행합니다.",
+      "ms": 2757
+    },
+    {
+      "pattern": "prompt-chaining",
+      "mutation": "dangling",
+      "outcome": "silent",
+      "detail": "[AgentLab] OPENAI_API_KEY 없음 → Mock LLM 모드로 실행합니다.",
+      "ms": 2819
+    },
+    {
+      "pattern": "router",
+      "mutation": "cut-end",
+      "outcome": "silent",
+      "detail": "[AgentLab] OPENAI_API_KEY 없음 → Mock LLM 모드로 실행합니다.",
+      "ms": 2957
+    },
+    {
+      "pattern": "router",
+      "mutation": "self-loop",
+      "outcome": "hang",
+      "detail": "For troubleshooting, visit: https://docs.langchain.com/oss/python/langgraph/errors/GRAPH_RECURSION_LIMIT",
+      "ms": 3075
+    },
+    {
+      "pattern": "router",
+      "mutation": "bad-ident",
+      "outcome": "crash",
+      "detail": "SyntaxError: invalid syntax",
+      "ms": 1978
+    },
+    {
+      "pattern": "router",
+      "mutation": "dup-name",
+      "outcome": "crash",
+      "detail": "During task with name 'classify' and id '39e41a71-c3f8-a5b1-4ac3-b26605372797'",
+      "ms": 4826
+    },
+    {
+      "pattern": "router",
+      "mutation": "unreachable",
+      "outcome": "crash",
+      "detail": "ValueError: Graph must have an entrypoint: add at least one edge from START to another node",
+      "ms": 2703
+    },
+    {
+      "pattern": "router",
+      "mutation": "no-start",
+      "outcome": "crash",
+      "detail": "ValueError: Graph must have an entrypoint: add at least one edge from START to another node",
+      "ms": 2661
+    },
+    {
+      "pattern": "router",
+      "mutation": "end-out",
+      "outcome": "silent",
+      "detail": "[AgentLab] OPENAI_API_KEY 없음 → Mock LLM 모드로 실행합니다.",
+      "ms": 2722
+    },
+    {
+      "pattern": "router",
+      "mutation": "dangling",
+      "outcome": "crash",
+      "detail": "SyntaxError: invalid syntax",
+      "ms": 2723
+    },
+    {
+      "pattern": "parallel",
+      "mutation": "cut-end",
+      "outcome": "silent",
+      "detail": "[AgentLab] OPENAI_API_KEY 없음 → Mock LLM 모드로 실행합니다.",
+      "ms": 2507
+    },
+    {
+      "pattern": "parallel",
+      "mutation": "self-loop",
+      "outcome": "hang",
+      "detail": "For troubleshooting, visit: https://docs.langchain.com/oss/python/langgraph/errors/GRAPH_RECURSION_LIMIT",
+      "ms": 2551
+    },
+    {
+      "pattern": "parallel",
+      "mutation": "bad-ident",
+      "outcome": "crash",
+      "detail": "SyntaxError: invalid syntax",
+      "ms": 1967
+    },
+    {
+      "pattern": "parallel",
+      "mutation": "dup-name",
+      "outcome": "crash",
+      "detail": "ValueError: Node `pros` already present.",
+      "ms": 2460
+    },
+    {
+      "pattern": "parallel",
+      "mutation": "unreachable",
+      "outcome": "crash",
+      "detail": "ValueError: Graph must have an entrypoint: add at least one edge from START to another node",
+      "ms": 2500
+    },
+    {
+      "pattern": "parallel",
+      "mutation": "no-start",
+      "outcome": "crash",
+      "detail": "ValueError: Graph must have an entrypoint: add at least one edge from START to another node",
+      "ms": 2516
+    },
+    {
+      "pattern": "parallel",
+      "mutation": "end-out",
+      "outcome": "silent",
+      "detail": "[AgentLab] OPENAI_API_KEY 없음 → Mock LLM 모드로 실행합니다.",
+      "ms": 2655
+    },
+    {
+      "pattern": "parallel",
+      "mutation": "dangling",
+      "outcome": "silent",
+      "detail": "[AgentLab] OPENAI_API_KEY 없음 → Mock LLM 모드로 실행합니다.",
+      "ms": 2705
+    },
+    {
+      "pattern": "map-reduce",
+      "mutation": "cut-end",
+      "outcome": "silent",
+      "detail": "[AgentLab] OPENAI_API_KEY 없음 → Mock LLM 모드로 실행합니다.",
+      "ms": 2692
+    },
+    {
+      "pattern": "map-reduce",
+      "mutation": "self-loop",
+      "outcome": "hang",
+      "detail": "For troubleshooting, visit: https://docs.langchain.com/oss/python/langgraph/errors/GRAPH_RECURSION_LIMIT",
+      "ms": 2807
+    },
+    {
+      "pattern": "map-reduce",
+      "mutation": "bad-ident",
+      "outcome": "crash",
+      "detail": "SyntaxError: invalid syntax",
+      "ms": 2020
+    },
+    {
+      "pattern": "map-reduce",
+      "mutation": "dup-name",
+      "outcome": "crash",
+      "detail": "During task with name 'planner' and id '04abfe76-ac53-e5c9-32ae-caa0e7df2140'",
+      "ms": 4916
+    },
+    {
+      "pattern": "map-reduce",
+      "mutation": "unreachable",
+      "outcome": "crash",
+      "detail": "ValueError: Graph must have an entrypoint: add at least one edge from START to another node",
+      "ms": 2431
+    },
+    {
+      "pattern": "map-reduce",
+      "mutation": "no-start",
+      "outcome": "crash",
+      "detail": "ValueError: Graph must have an entrypoint: add at least one edge from START to another node",
+      "ms": 2387
+    },
+    {
+      "pattern": "map-reduce",
+      "mutation": "end-out",
+      "outcome": "silent",
+      "detail": "[AgentLab] OPENAI_API_KEY 없음 → Mock LLM 모드로 실행합니다.",
+      "ms": 2532
+    },
+    {
+      "pattern": "map-reduce",
+      "mutation": "dangling",
+      "outcome": "silent",
+      "detail": "[AgentLab] OPENAI_API_KEY 없음 → Mock LLM 모드로 실행합니다.",
+      "ms": 2551
+    },
+    {
+      "pattern": "reflection",
+      "mutation": "cut-end",
+      "outcome": "crash",
+      "detail": "During task with name 'critic' and id '6424e39a-c100-6a78-faf8-2ca058b24778'",
+      "ms": 2532
+    },
+    {
+      "pattern": "reflection",
+      "mutation": "self-loop",
+      "outcome": "hang",
+      "detail": "For troubleshooting, visit: https://docs.langchain.com/oss/python/langgraph/errors/GRAPH_RECURSION_LIMIT",
+      "ms": 2768
+    },
+    {
+      "pattern": "reflection",
+      "mutation": "bad-ident",
+      "outcome": "crash",
+      "detail": "SyntaxError: invalid syntax",
+      "ms": 1987
+    },
+    {
+      "pattern": "reflection",
+      "mutation": "dup-name",
+      "outcome": "crash",
+      "detail": "ValueError: Node `writer` already present.",
+      "ms": 2509
+    },
+    {
+      "pattern": "reflection",
+      "mutation": "unreachable",
+      "outcome": "crash",
+      "detail": "ValueError: Graph must have an entrypoint: add at least one edge from START to another node",
+      "ms": 2538
+    },
+    {
+      "pattern": "reflection",
+      "mutation": "no-start",
+      "outcome": "crash",
+      "detail": "ValueError: Graph must have an entrypoint: add at least one edge from START to another node",
+      "ms": 2551
+    },
+    {
+      "pattern": "reflection",
+      "mutation": "end-out",
+      "outcome": "silent",
+      "detail": "[AgentLab] OPENAI_API_KEY 없음 → Mock LLM 모드로 실행합니다.",
+      "ms": 2637
+    },
+    {
+      "pattern": "reflection",
+      "mutation": "dangling",
+      "outcome": "silent",
+      "detail": "[AgentLab] OPENAI_API_KEY 없음 → Mock LLM 모드로 실행합니다.",
+      "ms": 2641
+    },
+    {
+      "pattern": "plan-execute",
+      "mutation": "cut-end",
+      "outcome": "silent",
+      "detail": "[AgentLab] OPENAI_API_KEY 없음 → Mock LLM 모드로 실행합니다.",
+      "ms": 2815
+    },
+    {
+      "pattern": "plan-execute",
+      "mutation": "self-loop",
+      "outcome": "hang",
+      "detail": "For troubleshooting, visit: https://docs.langchain.com/oss/python/langgraph/errors/GRAPH_RECURSION_LIMIT",
+      "ms": 3407
+    },
+    {
+      "pattern": "plan-execute",
+      "mutation": "bad-ident",
+      "outcome": "crash",
+      "detail": "SyntaxError: invalid syntax",
+      "ms": 1989
+    },
+    {
+      "pattern": "plan-execute",
+      "mutation": "dup-name",
+      "outcome": "crash",
+      "detail": "ValueError: Node `planner` already present.",
+      "ms": 2709
+    },
+    {
+      "pattern": "plan-execute",
+      "mutation": "unreachable",
+      "outcome": "crash",
+      "detail": "ValueError: Graph must have an entrypoint: add at least one edge from START to another node",
+      "ms": 2760
+    },
+    {
+      "pattern": "plan-execute",
+      "mutation": "no-start",
+      "outcome": "crash",
+      "detail": "ValueError: Graph must have an entrypoint: add at least one edge from START to another node",
+      "ms": 2770
+    },
+    {
+      "pattern": "plan-execute",
+      "mutation": "end-out",
+      "outcome": "silent",
+      "detail": "[AgentLab] OPENAI_API_KEY 없음 → Mock LLM 모드로 실행합니다.",
+      "ms": 2770
+    },
+    {
+      "pattern": "plan-execute",
+      "mutation": "dangling",
+      "outcome": "silent",
+      "detail": "[AgentLab] OPENAI_API_KEY 없음 → Mock LLM 모드로 실행합니다.",
+      "ms": 2855
+    },
+    {
+      "pattern": "supervisor",
+      "mutation": "cut-end",
+      "outcome": "silent",
+      "detail": "[AgentLab] OPENAI_API_KEY 없음 → Mock LLM 모드로 실행합니다.",
+      "ms": 2868
+    },
+    {
+      "pattern": "supervisor",
+      "mutation": "self-loop",
+      "outcome": "hang",
+      "detail": "For troubleshooting, visit: https://docs.langchain.com/oss/python/langgraph/errors/GRAPH_RECURSION_LIMIT",
+      "ms": 3326
+    },
+    {
+      "pattern": "supervisor",
+      "mutation": "bad-ident",
+      "outcome": "crash",
+      "detail": "SyntaxError: invalid syntax",
+      "ms": 2110
+    },
+    {
+      "pattern": "supervisor",
+      "mutation": "dup-name",
+      "outcome": "crash",
+      "detail": "ValueError: Node `supervisor` already present.",
+      "ms": 2909
+    },
+    {
+      "pattern": "supervisor",
+      "mutation": "unreachable",
+      "outcome": "crash",
+      "detail": "ValueError: Graph must have an entrypoint: add at least one edge from START to another node",
+      "ms": 2863
+    },
+    {
+      "pattern": "supervisor",
+      "mutation": "no-start",
+      "outcome": "crash",
+      "detail": "ValueError: Graph must have an entrypoint: add at least one edge from START to another node",
+      "ms": 3092
+    },
+    {
+      "pattern": "supervisor",
+      "mutation": "end-out",
+      "outcome": "silent",
+      "detail": "[AgentLab] OPENAI_API_KEY 없음 → Mock LLM 모드로 실행합니다.",
+      "ms": 3284
+    },
+    {
+      "pattern": "supervisor",
+      "mutation": "dangling",
+      "outcome": "silent",
+      "detail": "[AgentLab] OPENAI_API_KEY 없음 → Mock LLM 모드로 실행합니다.",
+      "ms": 3295
+    },
+    {
+      "pattern": "agentic-rag",
+      "mutation": "cut-end",
+      "outcome": "crash",
+      "detail": "During task with name 'grade' and id '4cbdcaa2-c405-4aa6-0be1-5ba5121c9f0f'",
+      "ms": 3408
+    },
+    {
+      "pattern": "agentic-rag",
+      "mutation": "self-loop",
+      "outcome": "hang",
+      "detail": "For troubleshooting, visit: https://docs.langchain.com/oss/python/langgraph/errors/GRAPH_RECURSION_LIMIT",
+      "ms": 3425
+    },
+    {
+      "pattern": "agentic-rag",
+      "mutation": "bad-ident",
+      "outcome": "crash",
+      "detail": "SyntaxError: invalid syntax",
+      "ms": 2361
+    },
+    {
+      "pattern": "agentic-rag",
+      "mutation": "dup-name",
+      "outcome": "crash",
+      "detail": "ValueError: Node `retrieve` already present.",
+      "ms": 2729
+    },
+    {
+      "pattern": "agentic-rag",
+      "mutation": "unreachable",
+      "outcome": "crash",
+      "detail": "ValueError: Graph must have an entrypoint: add at least one edge from START to another node",
+      "ms": 2963
+    },
+    {
+      "pattern": "agentic-rag",
+      "mutation": "no-start",
+      "outcome": "crash",
+      "detail": "ValueError: Graph must have an entrypoint: add at least one edge from START to another node",
+      "ms": 3005
+    },
+    {
+      "pattern": "agentic-rag",
+      "mutation": "end-out",
+      "outcome": "silent",
+      "detail": "[AgentLab] OPENAI_API_KEY 없음 → Mock LLM 모드로 실행합니다.",
+      "ms": 3116
+    },
+    {
+      "pattern": "agentic-rag",
+      "mutation": "dangling",
+      "outcome": "silent",
+      "detail": "[AgentLab] OPENAI_API_KEY 없음 → Mock LLM 모드로 실행합니다.",
+      "ms": 3125
+    },
+    {
+      "pattern": "hitl",
+      "mutation": "cut-end",
+      "outcome": "silent",
+      "detail": "[AgentLab] OPENAI_API_KEY 없음 → Mock LLM 모드로 실행합니다.",
+      "ms": 3019
+    },
+    {
+      "pattern": "hitl",
+      "mutation": "self-loop",
+      "outcome": "silent",
+      "detail": "[AgentLab] OPENAI_API_KEY 없음 → Mock LLM 모드로 실행합니다.",
+      "ms": 3171
+    },
+    {
+      "pattern": "hitl",
+      "mutation": "bad-ident",
+      "outcome": "crash",
+      "detail": "SyntaxError: invalid syntax",
+      "ms": 2077
+    },
+    {
+      "pattern": "hitl",
+      "mutation": "dup-name",
+      "outcome": "crash",
+      "detail": "ValueError: Node `support_agent` already present.",
+      "ms": 2916
+    },
+    {
+      "pattern": "hitl",
+      "mutation": "unreachable",
+      "outcome": "crash",
+      "detail": "ValueError: Graph must have an entrypoint: add at least one edge from START to another node",
+      "ms": 2890
+    },
+    {
+      "pattern": "hitl",
+      "mutation": "no-start",
+      "outcome": "crash",
+      "detail": "ValueError: Graph must have an entrypoint: add at least one edge from START to another node",
+      "ms": 2874
+    },
+    {
+      "pattern": "hitl",
+      "mutation": "end-out",
+      "outcome": "silent",
+      "detail": "[AgentLab] OPENAI_API_KEY 없음 → Mock LLM 모드로 실행합니다.",
+      "ms": 2901
+    },
+    {
+      "pattern": "hitl",
+      "mutation": "dangling",
+      "outcome": "silent",
+      "detail": "[AgentLab] OPENAI_API_KEY 없음 → Mock LLM 모드로 실행합니다.",
+      "ms": 2869
+    },
+    {
+      "pattern": "hitl",
+      "mutation": "no-checkpointer",
+      "outcome": "crash",
+      "detail": "RuntimeError: Cannot use Command(resume=...) without checkpointer",
+      "ms": 2800
+    },
+    {
+      "pattern": "support-system",
+      "mutation": "cut-end",
+      "outcome": "crash",
+      "detail": "During task with name 'qa_check' and id '9283fbbf-f3f7-2e63-5b4f-d621ada69e60'",
+      "ms": 3088
+    },
+    {
+      "pattern": "support-system",
+      "mutation": "self-loop",
+      "outcome": "hang",
+      "detail": "For troubleshooting, visit: https://docs.langchain.com/oss/python/langgraph/errors/GRAPH_RECURSION_LIMIT",
+      "ms": 3413
+    },
+    {
+      "pattern": "support-system",
+      "mutation": "bad-ident",
+      "outcome": "crash",
+      "detail": "SyntaxError: invalid syntax",
+      "ms": 2070
+    },
+    {
+      "pattern": "support-system",
+      "mutation": "dup-name",
+      "outcome": "crash",
+      "detail": "During task with name 'triage' and id '8b199d89-bfc8-8ae6-4b07-de90e32634f3'",
+      "ms": 3148
+    },
+    {
+      "pattern": "support-system",
+      "mutation": "unreachable",
+      "outcome": "crash",
+      "detail": "ValueError: Graph must have an entrypoint: add at least one edge from START to another node",
+      "ms": 3098
+    },
+    {
+      "pattern": "support-system",
+      "mutation": "no-start",
+      "outcome": "crash",
+      "detail": "ValueError: Graph must have an entrypoint: add at least one edge from START to another node",
+      "ms": 3049
+    },
+    {
+      "pattern": "support-system",
+      "mutation": "end-out",
+      "outcome": "silent",
+      "detail": "[AgentLab] OPENAI_API_KEY 없음 → Mock LLM 모드로 실행합니다.",
+      "ms": 2718
+    },
+    {
+      "pattern": "support-system",
+      "mutation": "dangling",
+      "outcome": "crash",
+      "detail": "SyntaxError: invalid syntax",
+      "ms": 2677
+    }
+  ]
+}

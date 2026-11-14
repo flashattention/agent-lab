@@ -129,3 +129,22 @@ SUPABASE_URL=https://xxxx.supabase.co SUPABASE_ANON_KEY=<anon public key> \
 
 최소 인스턴스가 0이라 한동안 요청이 없으면 첫 실행에 5~15초가 더 걸립니다.
 항상 빠르게 응답해야 한다면 `--min-instances 1`로 바꿀 수 있지만, 상시 비용이 생깁니다(월 수만 원 수준).
+
+## 부록: 다른 배포 방식
+
+### A. 단일 서버 (VPS, 권장)
+
+```bash
+WEB_ORIGIN=https://agentlab.example.com \
+PUBLIC_API_URL=https://api.agentlab.example.com \
+docker compose up -d --build
+```
+
+HTTPS는 앞단 리버스 프록시(Caddy, Nginx, Cloudflare Tunnel)에서 처리합니다. 예: `web:3000` → `agentlab.example.com`, `api:8000` → `api.agentlab.example.com`.
+
+### B. 분리 배포
+
+- **프론트엔드:** Vercel에 `frontend/`를 배포하고 `NEXT_PUBLIC_API_URL`을 백엔드 주소로 지정합니다.
+- **백엔드:** `backend/Dockerfile`을 Fly.io, Railway, Render, Cloud Run 등 컨테이너 플랫폼에 배포합니다.
+  - 환경변수 `AGENTLAB_CORS_ORIGINS`에 프론트엔드 도메인을 지정합니다.
+  - 캐시 DB를 유지하려면 `/data`에 볼륨을 붙입니다.

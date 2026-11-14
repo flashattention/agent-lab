@@ -1,0 +1,1108 @@
+{
+  "summary": {
+    "patterns": 12,
+    "defect_cases": 97,
+    "detected": 97,
+    "recall": 1,
+    "benign_cases": 48,
+    "false_positives": 0,
+    "false_positive_rate": 0
+  },
+  "byMutation": [
+    {
+      "id": "cut-end",
+      "label": "END 로 가는 엣지를 모두 끊음 (출구 없음)",
+      "defect": true,
+      "cases": 12,
+      "correct": 12,
+      "rate": 1,
+      "misses": []
+    },
+    {
+      "id": "self-loop",
+      "label": "노드가 자기 자신으로 무조건 돌아감 (무한 루프)",
+      "defect": true,
+      "cases": 12,
+      "correct": 12,
+      "rate": 1,
+      "misses": []
+    },
+    {
+      "id": "bad-ident",
+      "label": "노드 이름을 잘못된 Python 식별자로 (코드 주입·문법 오류)",
+      "defect": true,
+      "cases": 12,
+      "correct": 12,
+      "rate": 1,
+      "misses": []
+    },
+    {
+      "id": "dup-name",
+      "label": "두 노드 이름이 중복",
+      "defect": true,
+      "cases": 11,
+      "correct": 11,
+      "rate": 1,
+      "misses": []
+    },
+    {
+      "id": "unreachable",
+      "label": "START 에서 나가는 엣지 제거 (도달 불가)",
+      "defect": true,
+      "cases": 12,
+      "correct": 12,
+      "rate": 1,
+      "misses": []
+    },
+    {
+      "id": "no-start",
+      "label": "START 노드 삭제",
+      "defect": true,
+      "cases": 12,
+      "correct": 12,
+      "rate": 1,
+      "misses": []
+    },
+    {
+      "id": "empty-tools",
+      "label": "Tools 노드의 도구를 모두 제거",
+      "defect": true,
+      "cases": 1,
+      "correct": 1,
+      "rate": 1,
+      "misses": []
+    },
+    {
+      "id": "end-out",
+      "label": "END 에서 나가는 엣지 추가",
+      "defect": true,
+      "cases": 12,
+      "correct": 12,
+      "rate": 1,
+      "misses": []
+    },
+    {
+      "id": "dangling",
+      "label": "어디에도 연결되지 않은 노드 추가",
+      "defect": true,
+      "cases": 12,
+      "correct": 12,
+      "rate": 1,
+      "misses": []
+    },
+    {
+      "id": "no-checkpointer",
+      "label": "Human 노드가 있는데 Checkpointer 끔",
+      "defect": true,
+      "cases": 1,
+      "correct": 1,
+      "rate": 1,
+      "misses": []
+    },
+    {
+      "id": "move",
+      "label": "노드 위치 이동",
+      "defect": false,
+      "cases": 12,
+      "correct": 12,
+      "rate": 1,
+      "misses": []
+    },
+    {
+      "id": "rename",
+      "label": "노드 이름을 다른 올바른 이름으로",
+      "defect": false,
+      "cases": 12,
+      "correct": 12,
+      "rate": 1,
+      "misses": []
+    },
+    {
+      "id": "prompt",
+      "label": "프롬프트에 따옴표·줄바꿈 추가",
+      "defect": false,
+      "cases": 12,
+      "correct": 12,
+      "rate": 1,
+      "misses": []
+    },
+    {
+      "id": "demo-input",
+      "label": "데모 입력 변경",
+      "defect": false,
+      "cases": 12,
+      "correct": 12,
+      "rate": 1,
+      "misses": []
+    }
+  ],
+  "cases": [
+    {
+      "pattern": "react-agent",
+      "mutation": "cut-end",
+      "defect": true,
+      "flagged": true,
+      "first": "'END' 로 들어오는 엣지가 없습니다."
+    },
+    {
+      "pattern": "react-agent",
+      "mutation": "self-loop",
+      "defect": true,
+      "flagged": true,
+      "first": "'assistant' 이(가) 자기 자신으로 무조건 돌아갑니다 → 무한 루프"
+    },
+    {
+      "pattern": "react-agent",
+      "mutation": "bad-ident",
+      "defect": true,
+      "flagged": true,
+      "first": "'bad-name; import os' 은(는) 올바른 Python 식별자가 아닙니다."
+    },
+    {
+      "pattern": "react-agent",
+      "mutation": "dup-name",
+      "defect": true,
+      "flagged": true,
+      "first": "노드 이름 'assistant' 이(가) 중복됩니다."
+    },
+    {
+      "pattern": "react-agent",
+      "mutation": "unreachable",
+      "defect": true,
+      "flagged": true,
+      "first": "'START' 에서 나가는 엣지가 없습니다 (dead end)."
+    },
+    {
+      "pattern": "react-agent",
+      "mutation": "no-start",
+      "defect": true,
+      "flagged": true,
+      "first": "START 노드가 없습니다."
+    },
+    {
+      "pattern": "react-agent",
+      "mutation": "empty-tools",
+      "defect": true,
+      "flagged": true,
+      "first": "Tools 노드 'tools' 에 도구가 하나도 없습니다."
+    },
+    {
+      "pattern": "react-agent",
+      "mutation": "end-out",
+      "defect": true,
+      "flagged": true,
+      "first": "END 에서 나가는 엣지는 허용되지 않습니다."
+    },
+    {
+      "pattern": "react-agent",
+      "mutation": "dangling",
+      "defect": true,
+      "flagged": true,
+      "first": "'orphan_node' 에서 나가는 엣지가 없습니다 (dead end)."
+    },
+    {
+      "pattern": "react-agent",
+      "mutation": "move",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "react-agent",
+      "mutation": "rename",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "react-agent",
+      "mutation": "prompt",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "react-agent",
+      "mutation": "demo-input",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "prebuilt-agent",
+      "mutation": "cut-end",
+      "defect": true,
+      "flagged": true,
+      "first": "'travel_agent' 에서 나가는 엣지가 없습니다 (dead end)."
+    },
+    {
+      "pattern": "prebuilt-agent",
+      "mutation": "self-loop",
+      "defect": true,
+      "flagged": true,
+      "first": "'travel_agent' 이(가) 자기 자신으로 무조건 돌아갑니다 → 무한 루프"
+    },
+    {
+      "pattern": "prebuilt-agent",
+      "mutation": "bad-ident",
+      "defect": true,
+      "flagged": true,
+      "first": "'bad-name; import os' 은(는) 올바른 Python 식별자가 아닙니다."
+    },
+    {
+      "pattern": "prebuilt-agent",
+      "mutation": "unreachable",
+      "defect": true,
+      "flagged": true,
+      "first": "'START' 에서 나가는 엣지가 없습니다 (dead end)."
+    },
+    {
+      "pattern": "prebuilt-agent",
+      "mutation": "no-start",
+      "defect": true,
+      "flagged": true,
+      "first": "START 노드가 없습니다."
+    },
+    {
+      "pattern": "prebuilt-agent",
+      "mutation": "end-out",
+      "defect": true,
+      "flagged": true,
+      "first": "END 에서 나가는 엣지는 허용되지 않습니다."
+    },
+    {
+      "pattern": "prebuilt-agent",
+      "mutation": "dangling",
+      "defect": true,
+      "flagged": true,
+      "first": "'orphan_node' 에서 나가는 엣지가 없습니다 (dead end)."
+    },
+    {
+      "pattern": "prebuilt-agent",
+      "mutation": "move",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "prebuilt-agent",
+      "mutation": "rename",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "prebuilt-agent",
+      "mutation": "prompt",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "prebuilt-agent",
+      "mutation": "demo-input",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "prompt-chaining",
+      "mutation": "cut-end",
+      "defect": true,
+      "flagged": true,
+      "first": "'polish' 에서 나가는 엣지가 없습니다 (dead end)."
+    },
+    {
+      "pattern": "prompt-chaining",
+      "mutation": "self-loop",
+      "defect": true,
+      "flagged": true,
+      "first": "'outline' 이(가) 자기 자신으로 무조건 돌아갑니다 → 무한 루프"
+    },
+    {
+      "pattern": "prompt-chaining",
+      "mutation": "bad-ident",
+      "defect": true,
+      "flagged": true,
+      "first": "'bad-name; import os' 은(는) 올바른 Python 식별자가 아닙니다."
+    },
+    {
+      "pattern": "prompt-chaining",
+      "mutation": "dup-name",
+      "defect": true,
+      "flagged": true,
+      "first": "노드 이름 'outline' 이(가) 중복됩니다."
+    },
+    {
+      "pattern": "prompt-chaining",
+      "mutation": "unreachable",
+      "defect": true,
+      "flagged": true,
+      "first": "'START' 에서 나가는 엣지가 없습니다 (dead end)."
+    },
+    {
+      "pattern": "prompt-chaining",
+      "mutation": "no-start",
+      "defect": true,
+      "flagged": true,
+      "first": "START 노드가 없습니다."
+    },
+    {
+      "pattern": "prompt-chaining",
+      "mutation": "end-out",
+      "defect": true,
+      "flagged": true,
+      "first": "END 에서 나가는 엣지는 허용되지 않습니다."
+    },
+    {
+      "pattern": "prompt-chaining",
+      "mutation": "dangling",
+      "defect": true,
+      "flagged": true,
+      "first": "'orphan_node' 에서 나가는 엣지가 없습니다 (dead end)."
+    },
+    {
+      "pattern": "prompt-chaining",
+      "mutation": "move",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "prompt-chaining",
+      "mutation": "rename",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "prompt-chaining",
+      "mutation": "prompt",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "prompt-chaining",
+      "mutation": "demo-input",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "router",
+      "mutation": "cut-end",
+      "defect": true,
+      "flagged": true,
+      "first": "'order_agent' 에서 나가는 엣지가 없습니다 (dead end)."
+    },
+    {
+      "pattern": "router",
+      "mutation": "self-loop",
+      "defect": true,
+      "flagged": true,
+      "first": "'order_agent' 이(가) 자기 자신으로 무조건 돌아갑니다 → 무한 루프"
+    },
+    {
+      "pattern": "router",
+      "mutation": "bad-ident",
+      "defect": true,
+      "flagged": true,
+      "first": "'bad-name; import os' 은(는) 올바른 Python 식별자가 아닙니다."
+    },
+    {
+      "pattern": "router",
+      "mutation": "dup-name",
+      "defect": true,
+      "flagged": true,
+      "first": "노드 이름 'classify' 이(가) 중복됩니다."
+    },
+    {
+      "pattern": "router",
+      "mutation": "unreachable",
+      "defect": true,
+      "flagged": true,
+      "first": "'START' 에서 나가는 엣지가 없습니다 (dead end)."
+    },
+    {
+      "pattern": "router",
+      "mutation": "no-start",
+      "defect": true,
+      "flagged": true,
+      "first": "START 노드가 없습니다."
+    },
+    {
+      "pattern": "router",
+      "mutation": "end-out",
+      "defect": true,
+      "flagged": true,
+      "first": "END 에서 나가는 엣지는 허용되지 않습니다."
+    },
+    {
+      "pattern": "router",
+      "mutation": "dangling",
+      "defect": true,
+      "flagged": true,
+      "first": "'orphan_node' 에서 나가는 엣지가 없습니다 (dead end)."
+    },
+    {
+      "pattern": "router",
+      "mutation": "move",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "router",
+      "mutation": "rename",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "router",
+      "mutation": "prompt",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "router",
+      "mutation": "demo-input",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "parallel",
+      "mutation": "cut-end",
+      "defect": true,
+      "flagged": true,
+      "first": "'synthesize' 에서 나가는 엣지가 없습니다 (dead end)."
+    },
+    {
+      "pattern": "parallel",
+      "mutation": "self-loop",
+      "defect": true,
+      "flagged": true,
+      "first": "'pros' 이(가) 자기 자신으로 무조건 돌아갑니다 → 무한 루프"
+    },
+    {
+      "pattern": "parallel",
+      "mutation": "bad-ident",
+      "defect": true,
+      "flagged": true,
+      "first": "'bad-name; import os' 은(는) 올바른 Python 식별자가 아닙니다."
+    },
+    {
+      "pattern": "parallel",
+      "mutation": "dup-name",
+      "defect": true,
+      "flagged": true,
+      "first": "노드 이름 'pros' 이(가) 중복됩니다."
+    },
+    {
+      "pattern": "parallel",
+      "mutation": "unreachable",
+      "defect": true,
+      "flagged": true,
+      "first": "'START' 에서 나가는 엣지가 없습니다 (dead end)."
+    },
+    {
+      "pattern": "parallel",
+      "mutation": "no-start",
+      "defect": true,
+      "flagged": true,
+      "first": "START 노드가 없습니다."
+    },
+    {
+      "pattern": "parallel",
+      "mutation": "end-out",
+      "defect": true,
+      "flagged": true,
+      "first": "END 에서 나가는 엣지는 허용되지 않습니다."
+    },
+    {
+      "pattern": "parallel",
+      "mutation": "dangling",
+      "defect": true,
+      "flagged": true,
+      "first": "'orphan_node' 에서 나가는 엣지가 없습니다 (dead end)."
+    },
+    {
+      "pattern": "parallel",
+      "mutation": "move",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "parallel",
+      "mutation": "rename",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "parallel",
+      "mutation": "prompt",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "parallel",
+      "mutation": "demo-input",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "map-reduce",
+      "mutation": "cut-end",
+      "defect": true,
+      "flagged": true,
+      "first": "'aggregate' 에서 나가는 엣지가 없습니다 (dead end)."
+    },
+    {
+      "pattern": "map-reduce",
+      "mutation": "self-loop",
+      "defect": true,
+      "flagged": true,
+      "first": "'planner' 이(가) 자기 자신으로 무조건 돌아갑니다 → 무한 루프"
+    },
+    {
+      "pattern": "map-reduce",
+      "mutation": "bad-ident",
+      "defect": true,
+      "flagged": true,
+      "first": "'bad-name; import os' 은(는) 올바른 Python 식별자가 아닙니다."
+    },
+    {
+      "pattern": "map-reduce",
+      "mutation": "dup-name",
+      "defect": true,
+      "flagged": true,
+      "first": "노드 이름 'planner' 이(가) 중복됩니다."
+    },
+    {
+      "pattern": "map-reduce",
+      "mutation": "unreachable",
+      "defect": true,
+      "flagged": true,
+      "first": "'START' 에서 나가는 엣지가 없습니다 (dead end)."
+    },
+    {
+      "pattern": "map-reduce",
+      "mutation": "no-start",
+      "defect": true,
+      "flagged": true,
+      "first": "START 노드가 없습니다."
+    },
+    {
+      "pattern": "map-reduce",
+      "mutation": "end-out",
+      "defect": true,
+      "flagged": true,
+      "first": "END 에서 나가는 엣지는 허용되지 않습니다."
+    },
+    {
+      "pattern": "map-reduce",
+      "mutation": "dangling",
+      "defect": true,
+      "flagged": true,
+      "first": "'orphan_node' 에서 나가는 엣지가 없습니다 (dead end)."
+    },
+    {
+      "pattern": "map-reduce",
+      "mutation": "move",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "map-reduce",
+      "mutation": "rename",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "map-reduce",
+      "mutation": "prompt",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "map-reduce",
+      "mutation": "demo-input",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "reflection",
+      "mutation": "cut-end",
+      "defect": true,
+      "flagged": true,
+      "first": "'END' 로 들어오는 엣지가 없습니다."
+    },
+    {
+      "pattern": "reflection",
+      "mutation": "self-loop",
+      "defect": true,
+      "flagged": true,
+      "first": "'writer' 이(가) 자기 자신으로 무조건 돌아갑니다 → 무한 루프"
+    },
+    {
+      "pattern": "reflection",
+      "mutation": "bad-ident",
+      "defect": true,
+      "flagged": true,
+      "first": "'bad-name; import os' 은(는) 올바른 Python 식별자가 아닙니다."
+    },
+    {
+      "pattern": "reflection",
+      "mutation": "dup-name",
+      "defect": true,
+      "flagged": true,
+      "first": "노드 이름 'writer' 이(가) 중복됩니다."
+    },
+    {
+      "pattern": "reflection",
+      "mutation": "unreachable",
+      "defect": true,
+      "flagged": true,
+      "first": "'START' 에서 나가는 엣지가 없습니다 (dead end)."
+    },
+    {
+      "pattern": "reflection",
+      "mutation": "no-start",
+      "defect": true,
+      "flagged": true,
+      "first": "START 노드가 없습니다."
+    },
+    {
+      "pattern": "reflection",
+      "mutation": "end-out",
+      "defect": true,
+      "flagged": true,
+      "first": "END 에서 나가는 엣지는 허용되지 않습니다."
+    },
+    {
+      "pattern": "reflection",
+      "mutation": "dangling",
+      "defect": true,
+      "flagged": true,
+      "first": "'orphan_node' 에서 나가는 엣지가 없습니다 (dead end)."
+    },
+    {
+      "pattern": "reflection",
+      "mutation": "move",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "reflection",
+      "mutation": "rename",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "reflection",
+      "mutation": "prompt",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "reflection",
+      "mutation": "demo-input",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "plan-execute",
+      "mutation": "cut-end",
+      "defect": true,
+      "flagged": true,
+      "first": "'final_answer' 에서 나가는 엣지가 없습니다 (dead end)."
+    },
+    {
+      "pattern": "plan-execute",
+      "mutation": "self-loop",
+      "defect": true,
+      "flagged": true,
+      "first": "'planner' 이(가) 자기 자신으로 무조건 돌아갑니다 → 무한 루프"
+    },
+    {
+      "pattern": "plan-execute",
+      "mutation": "bad-ident",
+      "defect": true,
+      "flagged": true,
+      "first": "'bad-name; import os' 은(는) 올바른 Python 식별자가 아닙니다."
+    },
+    {
+      "pattern": "plan-execute",
+      "mutation": "dup-name",
+      "defect": true,
+      "flagged": true,
+      "first": "노드 이름 'planner' 이(가) 중복됩니다."
+    },
+    {
+      "pattern": "plan-execute",
+      "mutation": "unreachable",
+      "defect": true,
+      "flagged": true,
+      "first": "'START' 에서 나가는 엣지가 없습니다 (dead end)."
+    },
+    {
+      "pattern": "plan-execute",
+      "mutation": "no-start",
+      "defect": true,
+      "flagged": true,
+      "first": "START 노드가 없습니다."
+    },
+    {
+      "pattern": "plan-execute",
+      "mutation": "end-out",
+      "defect": true,
+      "flagged": true,
+      "first": "END 에서 나가는 엣지는 허용되지 않습니다."
+    },
+    {
+      "pattern": "plan-execute",
+      "mutation": "dangling",
+      "defect": true,
+      "flagged": true,
+      "first": "'orphan_node' 에서 나가는 엣지가 없습니다 (dead end)."
+    },
+    {
+      "pattern": "plan-execute",
+      "mutation": "move",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "plan-execute",
+      "mutation": "rename",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "plan-execute",
+      "mutation": "prompt",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "plan-execute",
+      "mutation": "demo-input",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "supervisor",
+      "mutation": "cut-end",
+      "defect": true,
+      "flagged": true,
+      "first": "'END' 로 들어오는 엣지가 없습니다."
+    },
+    {
+      "pattern": "supervisor",
+      "mutation": "self-loop",
+      "defect": true,
+      "flagged": true,
+      "first": "'researcher' 이(가) 자기 자신으로 무조건 돌아갑니다 → 무한 루프"
+    },
+    {
+      "pattern": "supervisor",
+      "mutation": "bad-ident",
+      "defect": true,
+      "flagged": true,
+      "first": "'bad-name; import os' 은(는) 올바른 Python 식별자가 아닙니다."
+    },
+    {
+      "pattern": "supervisor",
+      "mutation": "dup-name",
+      "defect": true,
+      "flagged": true,
+      "first": "노드 이름 'supervisor' 이(가) 중복됩니다."
+    },
+    {
+      "pattern": "supervisor",
+      "mutation": "unreachable",
+      "defect": true,
+      "flagged": true,
+      "first": "'START' 에서 나가는 엣지가 없습니다 (dead end)."
+    },
+    {
+      "pattern": "supervisor",
+      "mutation": "no-start",
+      "defect": true,
+      "flagged": true,
+      "first": "START 노드가 없습니다."
+    },
+    {
+      "pattern": "supervisor",
+      "mutation": "end-out",
+      "defect": true,
+      "flagged": true,
+      "first": "END 에서 나가는 엣지는 허용되지 않습니다."
+    },
+    {
+      "pattern": "supervisor",
+      "mutation": "dangling",
+      "defect": true,
+      "flagged": true,
+      "first": "'orphan_node' 로 들어오는 엣지가 없습니다."
+    },
+    {
+      "pattern": "supervisor",
+      "mutation": "move",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "supervisor",
+      "mutation": "rename",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "supervisor",
+      "mutation": "prompt",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "supervisor",
+      "mutation": "demo-input",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "agentic-rag",
+      "mutation": "cut-end",
+      "defect": true,
+      "flagged": true,
+      "first": "'END' 로 들어오는 엣지가 없습니다."
+    },
+    {
+      "pattern": "agentic-rag",
+      "mutation": "self-loop",
+      "defect": true,
+      "flagged": true,
+      "first": "'retrieve' 이(가) 자기 자신으로 무조건 돌아갑니다 → 무한 루프"
+    },
+    {
+      "pattern": "agentic-rag",
+      "mutation": "bad-ident",
+      "defect": true,
+      "flagged": true,
+      "first": "'bad-name; import os' 은(는) 올바른 Python 식별자가 아닙니다."
+    },
+    {
+      "pattern": "agentic-rag",
+      "mutation": "dup-name",
+      "defect": true,
+      "flagged": true,
+      "first": "노드 이름 'retrieve' 이(가) 중복됩니다."
+    },
+    {
+      "pattern": "agentic-rag",
+      "mutation": "unreachable",
+      "defect": true,
+      "flagged": true,
+      "first": "'START' 에서 나가는 엣지가 없습니다 (dead end)."
+    },
+    {
+      "pattern": "agentic-rag",
+      "mutation": "no-start",
+      "defect": true,
+      "flagged": true,
+      "first": "START 노드가 없습니다."
+    },
+    {
+      "pattern": "agentic-rag",
+      "mutation": "end-out",
+      "defect": true,
+      "flagged": true,
+      "first": "END 에서 나가는 엣지는 허용되지 않습니다."
+    },
+    {
+      "pattern": "agentic-rag",
+      "mutation": "dangling",
+      "defect": true,
+      "flagged": true,
+      "first": "'orphan_node' 에서 나가는 엣지가 없습니다 (dead end)."
+    },
+    {
+      "pattern": "agentic-rag",
+      "mutation": "move",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "agentic-rag",
+      "mutation": "rename",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "agentic-rag",
+      "mutation": "prompt",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "agentic-rag",
+      "mutation": "demo-input",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "hitl",
+      "mutation": "cut-end",
+      "defect": true,
+      "flagged": true,
+      "first": "'executor' 에서 나가는 엣지가 없습니다 (dead end)."
+    },
+    {
+      "pattern": "hitl",
+      "mutation": "self-loop",
+      "defect": true,
+      "flagged": true,
+      "first": "'support_agent' 이(가) 자기 자신으로 무조건 돌아갑니다 → 무한 루프"
+    },
+    {
+      "pattern": "hitl",
+      "mutation": "bad-ident",
+      "defect": true,
+      "flagged": true,
+      "first": "'bad-name; import os' 은(는) 올바른 Python 식별자가 아닙니다."
+    },
+    {
+      "pattern": "hitl",
+      "mutation": "dup-name",
+      "defect": true,
+      "flagged": true,
+      "first": "노드 이름 'support_agent' 이(가) 중복됩니다."
+    },
+    {
+      "pattern": "hitl",
+      "mutation": "unreachable",
+      "defect": true,
+      "flagged": true,
+      "first": "'START' 에서 나가는 엣지가 없습니다 (dead end)."
+    },
+    {
+      "pattern": "hitl",
+      "mutation": "no-start",
+      "defect": true,
+      "flagged": true,
+      "first": "START 노드가 없습니다."
+    },
+    {
+      "pattern": "hitl",
+      "mutation": "end-out",
+      "defect": true,
+      "flagged": true,
+      "first": "END 에서 나가는 엣지는 허용되지 않습니다."
+    },
+    {
+      "pattern": "hitl",
+      "mutation": "dangling",
+      "defect": true,
+      "flagged": true,
+      "first": "'orphan_node' 에서 나가는 엣지가 없습니다 (dead end)."
+    },
+    {
+      "pattern": "hitl",
+      "mutation": "no-checkpointer",
+      "defect": true,
+      "flagged": true,
+      "first": "Human 노드 'approval' 는 interrupt 를 쓰므로 Checkpointer 가 필요합니다."
+    },
+    {
+      "pattern": "hitl",
+      "mutation": "move",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "hitl",
+      "mutation": "rename",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "hitl",
+      "mutation": "prompt",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "hitl",
+      "mutation": "demo-input",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "support-system",
+      "mutation": "cut-end",
+      "defect": true,
+      "flagged": true,
+      "first": "'END' 로 들어오는 엣지가 없습니다."
+    },
+    {
+      "pattern": "support-system",
+      "mutation": "self-loop",
+      "defect": true,
+      "flagged": true,
+      "first": "'retrieve' 이(가) 자기 자신으로 무조건 돌아갑니다 → 무한 루프"
+    },
+    {
+      "pattern": "support-system",
+      "mutation": "bad-ident",
+      "defect": true,
+      "flagged": true,
+      "first": "'bad-name; import os' 은(는) 올바른 Python 식별자가 아닙니다."
+    },
+    {
+      "pattern": "support-system",
+      "mutation": "dup-name",
+      "defect": true,
+      "flagged": true,
+      "first": "노드 이름 'triage' 이(가) 중복됩니다."
+    },
+    {
+      "pattern": "support-system",
+      "mutation": "unreachable",
+      "defect": true,
+      "flagged": true,
+      "first": "'START' 에서 나가는 엣지가 없습니다 (dead end)."
+    },
+    {
+      "pattern": "support-system",
+      "mutation": "no-start",
+      "defect": true,
+      "flagged": true,
+      "first": "START 노드가 없습니다."
+    },
+    {
+      "pattern": "support-system",
+      "mutation": "end-out",
+      "defect": true,
+      "flagged": true,
+      "first": "END 에서 나가는 엣지는 허용되지 않습니다."
+    },
+    {
+      "pattern": "support-system",
+      "mutation": "dangling",
+      "defect": true,
+      "flagged": true,
+      "first": "'orphan_node' 에서 나가는 엣지가 없습니다 (dead end)."
+    },
+    {
+      "pattern": "support-system",
+      "mutation": "move",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "support-system",
+      "mutation": "rename",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "support-system",
+      "mutation": "prompt",
+      "defect": false,
+      "flagged": false
+    },
+    {
+      "pattern": "support-system",
+      "mutation": "demo-input",
+      "defect": false,
+      "flagged": false
+    }
+  ]
+}

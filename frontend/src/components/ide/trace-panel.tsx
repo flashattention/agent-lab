@@ -400,7 +400,7 @@ function Json({ value }: { value: unknown }) {
 }
 
 function JsonNode({ value, depth, name }: { value: unknown; depth: number; name?: string }) {
-  const [open, setOpen] = useState(depth < 2);
+  const [open, setOpen] = useState(depth < 3);
   const label = name !== undefined ? <span className="text-sky-600 dark:text-sky-400">{name}: </span> : null;
 
   if (value === null || typeof value !== "object") {
