@@ -99,10 +99,33 @@ cd frontend && npx vite-node scripts/eval-analyzer.ts ../docs/eval/analyzer.json
 cd backend && uv run python scripts/eval_defects.py /tmp/defects.json --json ../docs/eval/defects-runtime.json
 ```
 
-## 4. 실제 모델로 측정 (선택)
+## 4. 실제 모델 (gpt-5-mini, 패턴 12종 × 1회)
 
-`--live` 옵션은 실제 OpenAI 모델로 같은 실행을 측정합니다. 측정 항목은 성공률, 지연 시간, 토큰입니다. API 키와 비용이 들어서 기본 결과에는 넣지 않았습니다.
+**10/12 성공.** 실패 2건은 코드 오류가 아니라 **샌드박스 실행 상한(90초) 초과**입니다. 두 패턴 모두 중단될 때까지 노드가 정상적으로 진행 중이었습니다(Plan-Execute 노드 17개, Supervisor 노드 24개).
+
+| 패턴 | 결과 | 시간 (초) | 실행된 노드 | LLM 호출 | 도구 호출 | 토큰 |
+|---|---|---|---|---|---|---|
+| ReAct Agent (직접 구성) (`react-agent`) | ✅ | 23.9 | 3 | 2 | 2 | 2,348 |
+| create_agent 한 줄 에이전트 (`prebuilt-agent`) | ✅ | 15.8 | 5 | 2 | 1 | 1,542 |
+| Prompt Chaining (`prompt-chaining`) | ✅ | 28.3 | 4 | 3 | 0 | 3,525 |
+| Routing (의도 분류) (`router`) | ✅ | 13.7 | 5 | 3 | 1 | 1,265 |
+| Parallelization (Sectioning) (`parallel`) | ✅ | 45.4 | 4 | 4 | 0 | 8,242 |
+| Map-Reduce (Send API) (`map-reduce`) | ✅ | 49.8 | 6 | 6 | 0 | 9,049 |
+| Reflection / Evaluator-Optimizer (`reflection`) | ✅ | 22.9 | 2 | 2 | 0 | 3,299 |
+| Plan-and-Execute (`plan-execute`) | ⏱ 90초 초과 | 90.0 | 17 | 6 | 7 | 15,465 |
+| Supervisor 멀티 에이전트 (`supervisor`) | ⏱ 90초 초과 | 90.0 | 24 | 11 | 7 | 19,934 |
+| Agentic RAG (Corrective) (`agentic-rag`) | ✅ | 63.0 | 7 | 5 | 0 | 7,291 |
+| Human-in-the-loop 승인 (`hitl`) | ✅ | 26.1 | 13 | 4 | 3 | 4,991 |
+| 고객지원 시스템 (종합) (`support-system`) | ✅ | 52.9 | 5 | 5 | 0 | 6,404 |
+
+전체 토큰은 83,355개입니다. 패턴별 실행 시간의 중앙값은 36.8초로, Mock(약 2초)과 달리 대부분 모델 응답 대기 시간입니다.
+
+**발견한 것**
+- **지연 시간이 주된 제약입니다.** 직렬 LLM 호출이 많은 멀티 에이전트 패턴(Plan-Execute, Supervisor)은 실제 모델에서 90초를 넘깁니다. 구조 분석기는 이미 "LLM 호출이 최소 N번 직렬로 일어납니다"라는 경고를 내지만, 실행 상한과 연결된 예상 시간은 보여 주지 않습니다.
+- **Mock과 실제 모델의 경로는 다릅니다.** 같은 ReAct 패턴에서 실제 모델은 도구를 2번 호출했고(Mock은 1번), Map-Reduce는 분기 수가 달랐습니다. Mock eval은 "흐름이 끝까지 도는가"를 보는 것이고, 실제 동작은 이 측정으로 보완합니다.
+- **다음 개선 후보:** 직렬 LLM 호출 수로 예상 실행 시간을 계산해 분석기 경고에 표시하기, 단계가 많은 그래프에 더 긴 실행 상한 허용하기.
 
 ```bash
 OPENAI_API_KEY=sk-... uv run python scripts/eval_patterns.py --live --runs 1 --json ../docs/eval/patterns-live.json
+AGENTLAB_MAX_TIMEOUT=180 OPENAI_API_KEY=sk-... uv run python scripts/eval_patterns.py --live --runs 1 --timeout 180   # 상한을 늘려 재측정
 ```

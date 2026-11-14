@@ -28,9 +28,9 @@ from app.runner import stream_run  # noqa: E402
 FIXTURE = ROOT / "tests" / "fixtures" / "patterns.json"
 
 
-async def run_once(files: dict[str, str], api_key: str | None, model: str | None) -> dict:
+async def run_once(files: dict[str, str], api_key: str | None, model: str | None, timeout: int = 90) -> dict:
     stats = {"ok": False, "ms": 0, "nodes": 0, "llm": 0, "tools": 0, "tokens": 0, "events": 0, "errors": 0, "stderr": ""}
-    async for ev in stream_run(files, "main.py", api_key=api_key, model=model, timeout=90):
+    async for ev in stream_run(files, "main.py", api_key=api_key, model=model, timeout=timeout):
         if ev["type"] == "trace":
             e = ev["event"]
             stats["events"] += 1
@@ -56,6 +56,7 @@ async def main() -> int:
     ap.add_argument("--model", default="openai:gpt-5-mini")
     ap.add_argument("--json", type=Path)
     ap.add_argument("--concurrency", type=int, default=4)
+    ap.add_argument("--timeout", type=int, default=90, help="실행 1회 상한(초). 서버 AGENTLAB_MAX_TIMEOUT 를 넘으면 그 값으로 줄어든다")
     args = ap.parse_args()
 
     api_key = os.environ.get("OPENAI_API_KEY") if args.live else None
@@ -68,7 +69,7 @@ async def main() -> int:
 
     async def bounded(files):
         async with sem:
-            return await run_once(files, api_key, args.model)
+            return await run_once(files, api_key, args.model, args.timeout)
 
     rows = []
     for p in data["patterns"]:
