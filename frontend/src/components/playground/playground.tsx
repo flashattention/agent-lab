@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Background,
   BackgroundVariant,
@@ -25,10 +25,12 @@ import {
   Network,
   OctagonAlert,
   Play,
+  Redo2,
   RotateCcw,
   ShieldCheck,
   Sparkles,
   Square,
+  Undo2,
   X,
 } from "lucide-react";
 import { analyze } from "@/lib/playground/analyze";
@@ -46,8 +48,13 @@ import { SplitGroup, SplitHandle, SplitPanel } from "@/components/ui/split";
 import { AgentNode, type NodeStatus } from "./agent-node";
 import { Explorer } from "./explorer";
 import { PatternsDialog } from "./patterns-dialog";
+import { ProjectBar } from "./project-bar";
 import { RightPanel } from "./right-panel";
 import { CANVAS_TAB, toGraph, usePlayground } from "./store";
+import { useProjectSync } from "./use-project-sync";
+import { useAuth } from "@/lib/auth";
+import { SUPABASE_ENABLED } from "@/lib/supabase";
+import { SignInButton } from "@/components/auth/auth-menu";
 
 const nodeTypes = { agent: AgentNode };
 
@@ -67,11 +74,14 @@ function Workspace() {
   const apiKey = useSettings((x) => x.apiKey);
   const setSettingsOpen = useSettings((x) => x.setOpen);
   const runner = useRunner();
+  const sync = useProjectSync();
+  const user = useAuth((x) => x.user);
+  const needLogin = SUPABASE_ENABLED && !user; // 코드 실행·검증·고도화는 로그인한 사용자만
   const [showPatterns, setShowPatterns] = useState(false);
   const [bottomTab, setBottomTab] = useState<"problems" | "terminal">("problems");
   const [validation, setValidation] = useState<ValidateReport | null>(null);
   const [busy, setBusy] = useState<null | "validate" | "refine">(null);
-  const [notice, setNotice] = useState<{ kind: "ok" | "error" | "info"; text: string } | null>(null);
+  const [notice, setNotice] = useState<{ kind: "ok" | "error" | "info" | "login"; text: string } | null>(null);
   const [markers, setMarkers] = useState<Record<string, EditorMarker[]>>({});
   const [reveal, setReveal] = useState<{ line: number; nonce: number } | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -80,7 +90,9 @@ function Workspace() {
   useEffect(() => setMounted(true), []);
   // 처음 방문하면 ReAct 패턴으로 시작
   useEffect(() => {
-    if (mounted && usePlayground.getState().nodes.length === 0 && !usePlayground.getState().patternId) {
+    const st = usePlayground.getState();
+    const onProject = !!st.projectId || new URLSearchParams(window.location.search).has("p");
+    if (mounted && !onProject && st.nodes.length === 0 && !st.patternId) {
       usePlayground.getState().loadGraph(PATTERNS[0].graph, PATTERNS[0].id);
       setTimeout(() => rf.fitView({ padding: 0.2 }), 50);
     }
@@ -169,7 +181,10 @@ function Workspace() {
       if (!position) {
         const r = canvasRef.current?.getBoundingClientRect();
         position = rf.screenToFlowPosition({ x: (r?.left ?? 0) + (r?.width ?? 600) / 2, y: (r?.top ?? 0) + (r?.height ?? 400) / 2 });
-        position = { x: position.x - 110 + Math.random() * 40, y: position.y - 40 + Math.random() * 40 };
+        position = { x: position.x - 110, y: position.y - 40 };
+        // 이미 있는 노드와 겹치지 않는 자리를 찾을 때까지 오른쪽 아래로 옮긴다
+        const taken = (q: { x: number; y: number }) => usePlayground.getState().nodes.some((n) => Math.abs(n.position.x - q.x) < 230 && Math.abs(n.position.y - q.y) < 100);
+        for (let i = 0; i < 12 && taken(position); i++) position = { x: position.x + 250, y: position.y + (i % 3 === 2 ? 110 : 0) };
       }
       s.addNode(kind, position);
       s.setActiveTab(CANVAS_TAB);
@@ -177,8 +192,16 @@ function Workspace() {
     [rf, s],
   );
 
+  // 프로젝트를 새로 열면 화면에 맞춘다
+  useEffect(() => {
+    if (s.projectId) setTimeout(() => rf.fitView({ padding: 0.2 }), 60);
+  }, [s.projectId, rf]);
+
   /* ------------------------------------------------------------ 액션 */
+  const askLogin = () => setNotice({ kind: "login", text: "코드 실행, 검증, 고도화는 로그인 후 사용할 수 있습니다." });
+
   const run = async () => {
+    if (needLogin) return askLogin();
     setBottomTab("terminal");
     setMarkers({});
     const res = await runner.run(files, "main.py", { timeout: 90 });
@@ -189,6 +212,7 @@ function Workspace() {
   };
 
   const validate = async () => {
+    if (needLogin) return askLogin();
     setBusy("validate");
     setBottomTab("problems");
     try {
@@ -210,6 +234,7 @@ function Workspace() {
   };
 
   const refine = async () => {
+    if (needLogin) return askLogin();
     setBusy("refine");
     setNotice({ kind: "info", text: "고성능 LLM이 코드를 고도화하고, 문법 검사와 실행 검증을 진행 중입니다… (최대 1~2분)" });
     try {
@@ -233,16 +258,46 @@ function Workspace() {
     const blob = await zip.generateAsync({ type: "blob" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `${s.patternId ?? "langgraph-agent"}.zip`;
+    a.download = `${(s.projectId && s.projectName.trim().replace(/[\\/:*?"<>|\s]+/g, "-")) || s.patternId || "langgraph-agent"}.zip`;
     a.click();
     URL.revokeObjectURL(a.href);
   };
 
   useEffect(() => {
-    if (!notice || notice.kind === "info") return;
+    if (!notice || notice.kind === "info" || notice.kind === "login") return;
     const t = setTimeout(() => setNotice(null), 5000);
     return () => clearTimeout(t);
   }, [notice]);
+
+  // 단축키: 실행 취소/다시 실행, 실행, 저장. 입력 중이거나 코드 편집기 안에서는 편집기 쪽 단축키를 그대로 둔다.
+  const runRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    runRef.current = run;
+  });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      const el = e.target as HTMLElement | null;
+      const typing = !!el?.closest("input, textarea, select, [contenteditable=true], .monaco-editor");
+      const k = e.key.toLowerCase();
+      if (k === "s") {
+        e.preventDefault();
+        sync.flush();
+      } else if (k === "enter" && !typing) {
+        e.preventDefault();
+        runRef.current();
+      } else if (k === "z" && !typing) {
+        e.preventDefault();
+        if (e.shiftKey) usePlayground.getState().redo();
+        else usePlayground.getState().undo();
+      } else if (k === "y" && !typing) {
+        e.preventDefault();
+        usePlayground.getState().redo();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sync.flush]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const errors = analysis.issues.filter((i) => i.level === "error");
   const warnings = analysis.issues.filter((i) => i.level === "warning");
@@ -261,10 +316,14 @@ function Workspace() {
     <div className="flex h-[calc(100dvh-3.5rem)] min-h-0 flex-col">
       {/* 상단 툴바 */}
       <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-border bg-surface px-3">
-        <button onClick={() => setShowPatterns(true)} className="flex items-center gap-1.5 rounded-lg bg-accent-soft px-3 py-1.5 text-xs font-semibold text-accent hover:brightness-105">
+        <ProjectBar sync={sync} />
+        {SUPABASE_ENABLED && <div className="mx-1 h-5 w-px shrink-0 bg-border" />}
+        <button onClick={() => setShowPatterns(true)} className="flex shrink-0 items-center gap-1.5 rounded-lg bg-accent-soft px-3 py-1.5 text-xs font-semibold text-accent hover:brightness-105">
           <Library className="h-3.5 w-3.5" /> 패턴 예시
         </button>
-        <div className="mx-1 h-5 w-px bg-border" />
+        <div className="mx-1 h-5 w-px shrink-0 bg-border" />
+        <ToolButton icon={Undo2} label="실행 취소" title="실행 취소 (Ctrl/⌘+Z)" onClick={s.undo} disabled={!s.past.length} />
+        <ToolButton icon={Redo2} label="다시 실행" title="다시 실행 (Ctrl/⌘+Shift+Z)" onClick={s.redo} disabled={!s.future.length} />
         <ToolButton icon={LayoutGrid} label="자동 정렬" onClick={() => { s.autoLayout(); setTimeout(() => rf.fitView({ padding: 0.2, duration: 300 }), 30); }} />
         <ToolButton icon={Eraser} label="비우기" onClick={() => confirm("캔버스를 비울까요?") && s.clear()} />
         <div
@@ -289,7 +348,7 @@ function Workspace() {
           <button
             onClick={() => (apiKey || refinedValid ? refine() : setSettingsOpen(true))}
             disabled={!!busy || !analysis.ok}
-            className="flex items-center gap-1.5 rounded-lg border border-accent/40 bg-gradient-to-r from-accent/10 to-accent-2/10 px-3 py-1.5 text-xs font-semibold text-accent hover:border-accent disabled:opacity-40"
+            className="flex items-center gap-1.5 rounded-lg border border-accent/40 bg-accent-soft px-3 py-1.5 text-xs font-semibold text-accent hover:border-accent disabled:opacity-40"
             title="고성능 LLM으로 코드를 고도화하고, 검증을 통과하면 구조별로 캐싱합니다"
           >
             {busy === "refine" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />} LLM 고도화
@@ -303,7 +362,7 @@ function Workspace() {
               onClick={run}
               disabled={!analysis.ok}
               className="flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-1.5 text-xs font-semibold text-accent-fg hover:brightness-110 disabled:opacity-40"
-              title={analysis.ok ? "main.py 실행" : "구조 오류를 먼저 해결하세요"}
+              title={analysis.ok ? "main.py 실행 (Ctrl/⌘+Enter)" : "구조 오류를 먼저 해결하세요"}
             >
               <Play className="h-3 w-3 fill-current" /> 실행
             </button>
@@ -317,14 +376,26 @@ function Workspace() {
             "fade-in flex items-center gap-2 border-b px-4 py-1.5 text-xs",
             notice.kind === "ok" && "border-success/30 bg-success/10 text-success",
             notice.kind === "error" && "border-danger/30 bg-danger/10 text-danger",
-            notice.kind === "info" && "border-accent/30 bg-accent/10 text-accent",
+            (notice.kind === "info" || notice.kind === "login") && "border-accent/30 bg-accent/10 text-accent",
           )}
         >
           {notice.kind === "info" && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
           {notice.text}
+          {notice.kind === "login" && <SignInButton />}
           <button onClick={() => setNotice(null)} className="ml-auto opacity-70 hover:opacity-100">
             <X className="h-3.5 w-3.5" />
           </button>
+        </div>
+      )}
+
+      {sync.state === "missing" && (
+        <div className="flex items-center gap-2 border-b border-warning/30 bg-warning/10 px-4 py-1.5 text-xs text-warning">
+          이 링크의 프로젝트를 열 수 없습니다. 삭제되었거나 공유가 꺼져 있습니다. 본인 프로젝트라면 로그인해 주세요.
+        </div>
+      )}
+      {sync.state === "viewing" && (
+        <div className="border-b border-border bg-surface-2 px-4 py-1.5 text-xs text-muted">
+          공유받은 프로젝트입니다. 여기서 고친 내용은 저장되지 않습니다. 계속 작업하려면 내 프로젝트로 복제하세요.
         </div>
       )}
 
@@ -525,11 +596,11 @@ function Workspace() {
   );
 }
 
-function ToolButton({ icon: I, label, onClick, disabled }: { icon: typeof Play; label: string; onClick: () => void; disabled?: boolean }) {
+function ToolButton({ icon: I, label, title, onClick, disabled }: { icon: typeof Play; label: string; title?: string; onClick: () => void; disabled?: boolean }) {
   return (
-    <button onClick={onClick} disabled={disabled} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-muted hover:bg-surface-2 hover:text-fg disabled:opacity-40">
+    <button onClick={onClick} disabled={disabled} title={title ?? label} aria-label={label} className="flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-muted hover:bg-surface-2 hover:text-fg disabled:opacity-40">
       <I className="h-3.5 w-3.5" />
-      <span className="hidden lg:inline">{label}</span>
+      <span className="hidden 2xl:inline">{label}</span>
     </button>
   );
 }
@@ -597,7 +668,10 @@ function ProblemsPanel({
 export function Playground() {
   return (
     <ReactFlowProvider>
-      <Workspace />
+      {/* 주소의 ?p= 를 읽으므로 Suspense 로 감싼다 */}
+      <Suspense fallback={<div className="grid flex-1 place-items-center text-sm text-muted">플레이그라운드 로딩 중…</div>}>
+        <Workspace />
+      </Suspense>
     </ReactFlowProvider>
   );
 }

@@ -19,6 +19,26 @@
      ```
 3. **Vercel:** <https://vercel.com>에 GitHub 계정으로 가입합니다(Hobby).
 
+## 0-1. Supabase: 로그인과 프로젝트 저장 (최초 1회)
+
+Google 로그인, 프로젝트 저장, 링크 공유는 Supabase를 씁니다. 무료 요금제로 충분합니다.
+
+1. <https://supabase.com>에서 프로젝트를 만듭니다(리전은 Seoul 권장).
+2. **SQL Editor**에 [`supabase/schema.sql`](supabase/schema.sql) 내용을 붙여 넣고 실행합니다. `projects` 테이블과 행 단위 보안 정책이 만들어집니다.
+3. **Project Settings → API**에서 두 값을 적어 둡니다.
+   - Project URL (`https://xxxx.supabase.co`)
+   - anon public key (브라우저에 노출되어도 되는 키입니다. `service_role` 키는 어디에도 넣지 않습니다.)
+4. Google 로그인 연결
+   1. <https://console.cloud.google.com> → **API 및 서비스 → OAuth 동의 화면**을 만듭니다(외부, 앱 이름과 이메일만 입력).
+   2. **사용자 인증 정보 → OAuth 클라이언트 ID 만들기 → 웹 애플리케이션**을 선택합니다.
+      - 승인된 리디렉션 URI: `https://xxxx.supabase.co/auth/v1/callback`
+   3. 발급된 클라이언트 ID와 보안 비밀을 Supabase **Authentication → Sign In / Providers → Google**에 넣고 켭니다.
+5. Supabase **Authentication → URL Configuration**
+   - Site URL: 운영 주소 (`https://agentlab-louis.vercel.app`)
+   - Redirect URLs: `https://agentlab-louis.vercel.app/**`, `http://localhost:3000/**`
+
+> OAuth 동의 화면이 "테스트" 상태이면 등록한 테스트 사용자만 로그인할 수 있습니다. 누구나 쓰게 하려면 **앱 게시**를 누릅니다. 이메일과 프로필만 요청하므로 Google 심사는 필요 없습니다.
+
 ## 1. 프론트엔드 주소 정하기
 
 Vercel 프로젝트 이름이 운영 주소가 됩니다. 예: 이름이 `agentlab-louis`이면 주소는 `https://agentlab-louis.vercel.app`입니다.
@@ -27,8 +47,12 @@ Vercel 프로젝트 이름이 운영 주소가 됩니다. 예: 이름이 `agentl
 ## 2. 백엔드 배포 (Cloud Run)
 
 ```bash
-PROJECT=<GCP 프로젝트 ID> WEB_ORIGIN=https://agentlab-louis.vercel.app ./deploy/cloudrun.sh
+PROJECT=<GCP 프로젝트 ID> WEB_ORIGIN=https://agentlab-louis.vercel.app \
+SUPABASE_URL=https://xxxx.supabase.co SUPABASE_ANON_KEY=<anon public key> \
+./deploy/cloudrun.sh
 ```
+
+`SUPABASE_URL`과 `SUPABASE_ANON_KEY`를 주면 코드 실행·검증·고도화 요청에 로그인이 필요해지고, 사용자별 하루 한도가 적용됩니다. 생략하면 누구나 로그인 없이 실행할 수 있으므로 운영 배포에서는 꼭 넣습니다.
 
 스크립트는 다음을 차례로 수행합니다.
 
@@ -45,7 +69,10 @@ PROJECT=<GCP 프로젝트 ID> WEB_ORIGIN=https://agentlab-louis.vercel.app ./dep
 1. Vercel 대시보드에서 **Add New → Project**를 누르고 GitHub 저장소를 선택합니다.
 2. **Project Name:** 1단계에서 정한 이름(`agentlab-louis`)을 입력합니다.
 3. **Root Directory:** `frontend`를 지정합니다.
-4. **Environment Variables:** `NEXT_PUBLIC_API_URL`에 2단계에서 출력된 Cloud Run 주소를 넣습니다.
+4. **Environment Variables:** 세 가지를 넣습니다.
+   - `NEXT_PUBLIC_API_URL`: 2단계에서 출력된 Cloud Run 주소
+   - `NEXT_PUBLIC_SUPABASE_URL`: Supabase Project URL
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Supabase anon public key
 5. **Deploy**를 누릅니다.
 
 > `NEXT_PUBLIC_*` 값은 빌드할 때 코드에 박힙니다. 값을 바꾸면 **Redeploy**해야 반영됩니다.
@@ -53,7 +80,9 @@ PROJECT=<GCP 프로젝트 ID> WEB_ORIGIN=https://agentlab-louis.vercel.app ./dep
 ## 4. 확인
 
 - 사이트 우상단 배지가 **Runtime(초록)**이면 백엔드와 연결된 것입니다.
-- 강의 페이지에서 ▶ 실행이 되는지, 플레이그라운드에서 패턴 실행이 되는지 확인합니다.
+- 우상단 **로그인**으로 Google 로그인이 되는지 확인합니다.
+- 플레이그라운드에서 **프로젝트로 저장** → 새로고침해도 그대로인지, **공유** 링크를 시크릿 창에서 열면 보기 전용으로 열리는지 확인합니다.
+- 로그인한 상태에서 강의 페이지와 플레이그라운드의 ▶ 실행이 되는지, 로그아웃하면 로그인 안내가 나오는지 확인합니다.
 
 ## 운영 설정 요약
 
@@ -63,6 +92,7 @@ PROJECT=<GCP 프로젝트 ID> WEB_ORIGIN=https://agentlab-louis.vercel.app ./dep
 | 인스턴스 | 2 vCPU / 4GiB, 동시 요청 8 | 실행 1회에 약 300~500MB 사용 |
 | 최소/최대 인스턴스 | 0 / 3 | 요청이 없으면 0원. 최대 개수로 비용 상한을 둠 |
 | 요청 타임아웃 | 300초 | 코드 실행 상한은 90초 |
+| 하루 한도 (사용자별) | 실행 200 / 검증 100 / 고도화 20 | `AGENTLAB_DAILY_RUN`, `AGENTLAB_DAILY_VALIDATE`, `AGENTLAB_DAILY_REFINE`로 조정. 인스턴스 메모리에 기록하므로 인스턴스가 여러 개이거나 재시작되면 실제 허용량은 더 커질 수 있음 |
 | 캐시 | GCS `refine-cache/<구조해시>.json` | 인스턴스끼리 공유되고, 재시작해도 유지됨 |
 
 ## 예상 비용

@@ -1,11 +1,12 @@
 # AgentLab
 
-AI Agent를 처음 배우는 사람부터 현업 엔지니어 수준까지 학습할 수 있는 플랫폼입니다. LangChain 1.4와 LangGraph 1.2를 기준으로 합니다.
+AI 에이전트를 그려서 설계하는 작업 공간이자 학습 플랫폼입니다. 그래프를 그리면 실행되는 LangGraph 코드가 만들어지고, Google 로그인으로 프로젝트를 저장하고 링크로 공유합니다. LangChain 1.4와 LangGraph 1.2를 기준으로 합니다.
 
 | 공간 | 내용 |
 | --- | --- |
 | **학습** `/learn` | 8개 모듈, 40여 개 강의로 구성됩니다. 왼쪽에는 이론, 오른쪽에는 Monaco IDE가 있어 코드를 실행하고, traceback을 클릭해 오류 위치로 이동하며, 자동 채점 과제를 풀 수 있습니다. 강의마다 퀴즈가 있습니다. |
 | **플레이그라운드** `/playground` | 노드를 드래그해 연결하면 LangGraph 프로젝트(파일 트리)가 실시간으로 생성됩니다. 구조 분석으로 오류는 빨강, 병목과 위험은 노랑으로 표시합니다. 패턴 12종을 제공하고, 실행, 검증, LLM 고도화와 결과 캐싱, ZIP 다운로드를 지원합니다. |
+| **내 프로젝트** `/projects` | Google 로그인 후 프로젝트를 여러 개 만들고 자동 저장합니다. 공유 링크(`/playground?p=<id>`)를 받은 사람은 보기 전용으로 열고, 자기 작업 공간에 복제해 편집합니다. |
 | **Docs** `/docs` | LangChain, LangGraph, Vector DB, 통합 도구의 한국어 API 레퍼런스입니다. ⌘K로 검색할 수 있습니다. |
 
 ## 구조
@@ -15,7 +16,10 @@ frontend/   Next.js 16 (App Router) · Tailwind 4 · React Flow · Monaco
   content/learn/<module>/<lesson>/   강의 (lesson.md, examples/, exercise.py, solution.py, quiz.json)
   content/docs/<category>/*.md       레퍼런스 문서
   src/lib/playground/                그래프 모델 · 구조 분석기 · 코드 생성기 · 패턴
+  src/lib/{supabase,auth,projects}.ts  로그인 · 프로젝트 저장/공유
+supabase/schema.sql                  projects 테이블과 행 단위 보안 정책
 backend/    FastAPI · uv · Python 3.13
+  app/auth.py        로그인 확인(Supabase) · 사용자별 하루 한도
   app/runner.py      격리된 subprocess 실행 (타임아웃, rlimit, 출력 상한, 동시성 제한)
   app/validate.py    ruff 정적 검사와 Mock 모드 실제 실행 검증
   app/refine.py      고성능 LLM 고도화 → 검증 통과 시 그래프 구조 해시로 SQLite 캐시
@@ -36,6 +40,14 @@ cd frontend
 npm install
 npm run dev            # 백엔드 주소를 바꾸려면 NEXT_PUBLIC_API_URL 환경변수를 지정합니다.
 ```
+
+### 로그인과 프로젝트 저장 (선택)
+
+`frontend/.env.example`을 `.env.local`로 복사해 Supabase 값을 채우고, 백엔드에는 `SUPABASE_URL`, `SUPABASE_ANON_KEY` 환경변수를 줍니다. 설정 방법은 [DEPLOY.md](DEPLOY.md)의 0-1 단계에 있습니다.
+
+- 값이 없으면 로그인 없이 동작합니다. 캔버스는 브라우저에만 저장되고, 코드 실행에 제한이 없습니다.
+- 값이 있으면 코드 실행·검증·고도화는 로그인한 사용자만 쓸 수 있고, 사용자별 하루 한도가 적용됩니다(`backend/app/auth.py`).
+- 프로젝트 데이터는 브라우저가 Supabase에 직접 읽고 씁니다. 접근 권한은 `supabase/schema.sql`의 행 단위 보안 정책이 정합니다.
 
 OpenAI API Key는 사이트 우상단 **API Key**에서 입력합니다. 키는 브라우저 localStorage에만 저장되고, 실행 요청 헤더(`x-openai-key`)로만 전달되며, 서버는 저장하지 않습니다. 키가 없으면 모든 코드가 **Mock LLM 모드**로 실행됩니다.
 

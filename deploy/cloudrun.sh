@@ -2,7 +2,9 @@
 # AgentLab API → Google Cloud Run 배포
 #
 # 사용법:
-#   PROJECT=my-gcp-project WEB_ORIGIN=https://agentlab.vercel.app ./deploy/cloudrun.sh
+#   PROJECT=my-gcp-project WEB_ORIGIN=https://agentlab.vercel.app \
+#   SUPABASE_URL=https://xxxx.supabase.co SUPABASE_ANON_KEY=... ./deploy/cloudrun.sh
+#   (SUPABASE_* 를 생략하면 로그인 없이 누구나 코드를 실행할 수 있는 상태로 배포된다)
 #
 # 선택 환경변수:
 #   REGION      (기본 asia-northeast3 = 서울)
@@ -55,7 +57,7 @@ gcloud run deploy "$SERVICE" \
   --min-instances 0 --max-instances "$MAX_INSTANCES" \
   --timeout 300 \
   --cpu-boost \
-  --set-env-vars "^@^AGENTLAB_CACHE_BUCKET=${BUCKET}@AGENTLAB_CORS_ORIGINS=${WEB_ORIGIN}@AGENTLAB_CORS_ORIGIN_REGEX=${ORIGIN_REGEX}@WEB_CONCURRENCY=2@AGENTLAB_MAX_CONCURRENCY=4"
+  --set-env-vars "^@^AGENTLAB_CACHE_BUCKET=${BUCKET}@AGENTLAB_CORS_ORIGINS=${WEB_ORIGIN}@AGENTLAB_CORS_ORIGIN_REGEX=${ORIGIN_REGEX}@WEB_CONCURRENCY=2@AGENTLAB_MAX_CONCURRENCY=4@SUPABASE_URL=${SUPABASE_URL:-}@SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-}"
 
 URL="$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')"
 echo

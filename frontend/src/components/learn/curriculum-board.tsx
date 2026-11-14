@@ -29,7 +29,7 @@ export function CurriculumBoard({ curriculum }: { curriculum: Module[] }) {
             </span>
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-surface-3">
-            <div className="h-full rounded-full bg-gradient-to-r from-accent to-accent-2 transition-all" style={{ width: `${pct}%` }} />
+            <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${pct}%` }} />
           </div>
         </div>
         {nextLesson && (

@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from .auth import AUTH_REQUIRED, daily_limit, require_user
 from .refine import cache_get, refine, structure_key
 from .runner import RunError, stream_run
 from .validate import validate
@@ -88,13 +89,14 @@ class RefineRequest(BaseModel):
 @app.get("/api/health")
 async def health():
     pkgs = ["langgraph", "langchain", "langchain-core", "langchain-openai", "pydantic"]
-    return {"ok": True, "versions": {p: version(p) for p in pkgs}, "python": os.sys.version.split()[0]}
+    return {"ok": True, "versions": {p: version(p) for p in pkgs}, "python": os.sys.version.split()[0], "auth_required": AUTH_REQUIRED}
 
 
 @app.post("/api/run")
 async def run(req: Request, body: RunRequest):
     """NDJSON 스트리밍으로 실행 이벤트를 전달한다."""
     rate_limit(req, "run")
+    daily_limit(await require_user(req), "run")
     api_key = _key(req)
 
     async def gen():
@@ -112,6 +114,7 @@ async def run(req: Request, body: RunRequest):
 @app.post("/api/validate")
 async def validate_route(req: Request, body: ValidateRequest):
     rate_limit(req, "validate")
+    daily_limit(await require_user(req), "validate")
     try:
         return await validate(body.files, body.entry)
     except RunError as e:
@@ -121,6 +124,7 @@ async def validate_route(req: Request, body: ValidateRequest):
 @app.post("/api/refine")
 async def refine_route(req: Request, body: RefineRequest):
     rate_limit(req, "refine")
+    daily_limit(await require_user(req), "refine")
     try:
         return await refine(body.graph, body.files, _key(req), body.model)
     except RunError as e:
