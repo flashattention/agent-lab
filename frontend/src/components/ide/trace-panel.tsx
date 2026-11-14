@@ -19,7 +19,9 @@ import {
   Workflow,
   Box,
 } from "lucide-react";
+import { useDefaultLayout } from "react-resizable-panels";
 import { cn } from "@/lib/utils";
+import { SplitGroup, SplitHandle, SplitPanel } from "@/components/ui/split";
 import { buildTrace, fmtMs, fmtNum, type Span, type SpanKind, type TraceEvent, type TraceMessage, type TraceTree } from "@/lib/trace";
 
 const KIND: Record<SpanKind, { icon: typeof Bot; label: string; color: string }> = {
@@ -48,6 +50,23 @@ export function TracePanel({ events, live }: { events: TraceEvent[]; live: boole
   const [follow, setFollow] = useState(true);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const listRef = useRef<HTMLDivElement>(null);
+  // 패널 폭에 따라 위/아래(좁을 때) 또는 좌/우(넓을 때)로 나누고, 구분선 위치는 방향별로 기억한다
+  const boxRef = useRef<HTMLDivElement>(null);
+  const [wide, setWide] = useState(false);
+  const hasEvents = events.length > 0;
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => setWide(e.contentRect.width >= 576));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [hasEvents]);
+  const orientation = wide ? "horizontal" : "vertical";
+  const layout = useDefaultLayout({
+    id: `agentlab-trace-${orientation}`,
+    panelIds: ["tree", "detail"],
+    storage: typeof window === "undefined" ? undefined : localStorage,
+  });
   const now = events.length ? events[events.length - 1].t : 0;
 
   // 새 실행이 시작되면 선택을 초기화하고 따라가기를 켠다 (렌더 중 상태 조정)
@@ -116,7 +135,7 @@ export function TracePanel({ events, live }: { events: TraceEvent[]; live: boole
   const sel = selected ? tree.spans.get(selected) : undefined;
 
   return (
-    <div className="@container flex h-full min-h-0 flex-col bg-surface text-[12px]">
+    <div className="flex h-full min-h-0 flex-col bg-surface text-[12px]">
       <Summary
         tree={tree}
         live={live}
@@ -126,63 +145,70 @@ export function TracePanel({ events, live }: { events: TraceEvent[]; live: boole
           setFollow(!follow);
         }}
       />
-      <div className="flex min-h-0 flex-1 flex-col @xl:flex-row">
-        <div ref={listRef} className="min-h-0 shrink-0 basis-[42%] overflow-auto border-b border-border py-1 @xl:basis-[44%] @xl:border-r @xl:border-b-0">
-          {rows.map((s) => {
-            const K = KIND[s.kind];
-            const open = !collapsed.has(s.id);
-            return (
-              <div
-                key={s.id}
-                data-span={s.id}
-                onClick={() => setSelected(s.id)}
-                className={cn(
-                  "flex cursor-pointer items-center gap-1.5 py-[3px] pr-2 hover:bg-surface-2",
-                  selected === s.id && "bg-accent-soft hover:bg-accent-soft",
-                  s.kind === "chain" && "opacity-75",
-                )}
-                style={{ paddingLeft: 6 + s.depth * 14 }}
-              >
-                {s.children.length ? (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setCollapsed((c) => {
-                        const n = new Set(c);
-                        if (n.has(s.id)) n.delete(s.id);
-                        else n.add(s.id);
-                        return n;
-                      });
-                    }}
-                    className="rounded text-muted hover:text-fg"
-                    aria-label={open ? "접기" : "펼치기"}
+      <div ref={boxRef} className="min-h-0 flex-1">
+        <SplitGroup key={orientation} orientation={orientation} className="h-full" defaultLayout={layout.defaultLayout} onLayoutChanged={layout.onLayoutChanged}>
+          <SplitPanel id="tree" defaultSize="42" minSize="12">
+            <div ref={listRef} className="h-full overflow-auto py-1">
+              {rows.map((s) => {
+                const K = KIND[s.kind];
+                const open = !collapsed.has(s.id);
+                return (
+                  <div
+                    key={s.id}
+                    data-span={s.id}
+                    onClick={() => setSelected(s.id)}
+                    className={cn(
+                      "flex cursor-pointer items-center gap-1.5 py-[3px] pr-2 hover:bg-surface-2",
+                      selected === s.id && "bg-accent-soft hover:bg-accent-soft",
+                      s.kind === "chain" && "opacity-75",
+                    )}
+                    style={{ paddingLeft: 6 + s.depth * 14 }}
                   >
-                    {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                  </button>
-                ) : (
-                  <span className="w-3" />
-                )}
-                <K.icon className={cn("h-3.5 w-3.5 shrink-0", K.color)} />
-                <span className={cn("truncate", s.kind === "node" || s.kind === "graph" ? "font-medium text-fg" : "text-fg-2")}>{s.name}</span>
-                {s.kind === "node" && s.meta.langgraph_step != null && <span className="shrink-0 font-mono text-[10px] text-muted">#{s.meta.langgraph_step}</span>}
-                {s.kind === "llm" && s.message?.tool_calls?.length ? (
-                  <span title="도구 호출 요청" className="flex shrink-0 items-center gap-0.5 rounded bg-amber-500/15 px-1 text-[10px] text-amber-600 dark:text-amber-400">
-                    <Hammer className="h-2.5 w-2.5" />
-                    {s.message.tool_calls.length}
-                  </span>
-                ) : null}
-                <span className="ml-auto flex shrink-0 items-center gap-1.5 pl-2">
-                  {s.usage && <span className="font-mono text-[10px] text-violet-500">{fmtNum(s.usage.total)}t</span>}
-                  <span className="w-11 text-right font-mono text-[10px] text-muted">{fmtMs(duration(s, now))}</span>
-                  <StatusIcon s={s} />
-                </span>
-              </div>
-            );
-          })}
-        </div>
-        <div className="min-h-0 min-w-0 flex-1 overflow-auto">
-          {sel ? <Detail s={sel} now={now} /> : <div className="p-4 text-muted">왼쪽에서 항목을 선택하세요.</div>}
-        </div>
+                    {s.children.length ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCollapsed((c) => {
+                            const n = new Set(c);
+                            if (n.has(s.id)) n.delete(s.id);
+                            else n.add(s.id);
+                            return n;
+                          });
+                        }}
+                        className="rounded text-muted hover:text-fg"
+                        aria-label={open ? "접기" : "펼치기"}
+                      >
+                        {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                      </button>
+                    ) : (
+                      <span className="w-3" />
+                    )}
+                    <K.icon className={cn("h-3.5 w-3.5 shrink-0", K.color)} />
+                    <span className={cn("truncate", s.kind === "node" || s.kind === "graph" ? "font-medium text-fg" : "text-fg-2")}>{s.name}</span>
+                    {s.kind === "node" && s.meta.langgraph_step != null && <span className="shrink-0 font-mono text-[10px] text-muted">#{s.meta.langgraph_step}</span>}
+                    {s.kind === "llm" && s.message?.tool_calls?.length ? (
+                      <span title="도구 호출 요청" className="flex shrink-0 items-center gap-0.5 rounded bg-amber-500/15 px-1 text-[10px] text-amber-600 dark:text-amber-400">
+                        <Hammer className="h-2.5 w-2.5" />
+                        {s.message.tool_calls.length}
+                      </span>
+                    ) : null}
+                    <span className="ml-auto flex shrink-0 items-center gap-1.5 pl-2">
+                      {s.usage && <span className="font-mono text-[10px] text-violet-500">{fmtNum(s.usage.total)}t</span>}
+                      <span className="w-11 text-right font-mono text-[10px] text-muted">{fmtMs(duration(s, now))}</span>
+                      <StatusIcon s={s} />
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </SplitPanel>
+          <SplitHandle vertical={!wide} />
+          <SplitPanel id="detail" defaultSize="58" minSize="15">
+            <div className="h-full min-w-0 overflow-auto">
+              {sel ? <Detail s={sel} now={now} /> : <div className="p-4 text-muted">{wide ? "왼쪽" : "위"}에서 항목을 선택하세요.</div>}
+            </div>
+          </SplitPanel>
+        </SplitGroup>
       </div>
     </div>
   );
