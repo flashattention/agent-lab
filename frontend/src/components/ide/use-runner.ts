@@ -7,6 +7,14 @@ import type { TraceEvent } from "@/lib/trace";
 export type ConsoleLine = { kind: "stdout" | "stderr" | "info" | "error" | "success"; text: string };
 export type RunStatus = "idle" | "running" | "ok" | "error";
 
+/** 저장해 두었다가 다시 보여 줄 실행 결과 (출력·트레이스). */
+export type RunSnapshot = {
+  lines: ConsoleLine[];
+  status: RunStatus;
+  meta: { mock?: boolean; duration?: number; code?: number } | null;
+  trace: TraceEvent[];
+};
+
 export type TraceLocation = { file: string; line: number; message: string };
 
 /** Python traceback 에서 사용자 파일의 마지막 오류 위치를 찾는다. */
@@ -32,6 +40,7 @@ export function useRunner() {
   const [meta, setMeta] = useState<{ mock?: boolean; duration?: number; code?: number } | null>(null);
   const [stderrAll, setStderrAll] = useState("");
   const abortRef = useRef<AbortController | null>(null);
+  const runningRef = useRef(false);
   // 트레이스 이벤트는 많이 올 수 있으므로 모아 두었다가 프레임마다 한 번만 반영한다
   const [trace, setTrace] = useState<TraceEvent[]>([]);
   const traceBuf = useRef<TraceEvent[]>([]);
@@ -62,6 +71,7 @@ export function useRunner() {
     abortRef.current?.abort();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
+    runningRef.current = true;
     setLines([{ kind: "info", text: `$ python ${entry}\n` }]);
     setStatus("running");
     setMeta(null);
@@ -100,6 +110,7 @@ export function useRunner() {
     flushTrace();
     setStderrAll(stderr);
     setStatus(final);
+    runningRef.current = false;
     return { ok: final === "ok", stderr };
   }, [flushTrace, pushTrace]);
 
@@ -112,5 +123,15 @@ export function useRunner() {
     setTrace([]);
   }, []);
 
-  return { lines, status, meta, run, stop, clear, stderrAll, trace };
+  /** 저장해 둔 실행 결과를 다시 보여 준다 (실행 중이면 무시). */
+  const restore = useCallback((s: RunSnapshot) => {
+    if (runningRef.current) return;
+    setLines(s.lines);
+    setStatus(s.status === "running" ? "idle" : s.status);
+    setMeta(s.meta);
+    traceBuf.current = s.trace;
+    setTrace(s.trace);
+  }, []);
+
+  return { lines, status, meta, run, stop, clear, restore, stderrAll, trace };
 }

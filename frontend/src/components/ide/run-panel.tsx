@@ -8,8 +8,23 @@ import { TracePanel } from "./trace-panel";
 import type { useRunner } from "./use-runner";
 
 /** 실행 결과 패널: 출력(콘솔) / 트레이스 탭. 트레이스가 들어오기 시작하면 한 번 자동으로 트레이스 탭을 보여 준다. */
-export function RunPanel({ runner, onJump }: { runner: ReturnType<typeof useRunner>; onJump?: (file: string, line: number) => void }) {
-  const [tab, setTab] = useState<"output" | "trace">("output");
+export type RunTab = "output" | "trace";
+
+export function RunPanel({
+  runner,
+  onJump,
+  tab: tabProp,
+  onTab,
+}: {
+  runner: ReturnType<typeof useRunner>;
+  onJump?: (file: string, line: number) => void;
+  /** 넘기면 탭 선택을 바깥에서 관리한다 (강의별로 저장할 때) */
+  tab?: RunTab;
+  onTab?: (t: RunTab) => void;
+}) {
+  const [tabState, setTabState] = useState<RunTab>("output");
+  const tab = tabProp ?? tabState;
+  const setTab = (t: RunTab) => (onTab ? onTab(t) : setTabState(t));
   const running = runner.status === "running";
   const hasTrace = runner.trace.length > 0;
 

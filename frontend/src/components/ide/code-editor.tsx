@@ -2,7 +2,7 @@
 
 import Editor, { type BeforeMount, type OnMount } from "@monaco-editor/react";
 import { useTheme } from "next-themes";
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useSettings } from "@/lib/settings";
 
 type Monaco = Parameters<BeforeMount>[0];
@@ -47,6 +47,28 @@ const defineThemes: BeforeMount = (monaco) => {
   });
 };
 
+const VIEW_PREFIX = "agentlab-view:";
+
+/** 파일별 스크롤·커서 위치를 브라우저에 저장한다. */
+function readView(path: string) {
+  try {
+    return JSON.parse(localStorage.getItem(VIEW_PREFIX + path) || "null");
+  } catch {
+    return null;
+  }
+}
+function writeView(path: string, state: unknown) {
+  try {
+    if (state) localStorage.setItem(VIEW_PREFIX + path, JSON.stringify(state));
+  } catch {}
+}
+/** prefix 로 시작하는 파일들의 저장된 위치를 지운다 (코드를 원본으로 되돌릴 때). */
+export function clearSavedViews(pathPrefix: string) {
+  try {
+    for (const k of Object.keys(localStorage)) if (k.startsWith(VIEW_PREFIX + pathPrefix)) localStorage.removeItem(k);
+  } catch {}
+}
+
 export function CodeEditor({
   path,
   value,
@@ -55,6 +77,7 @@ export function CodeEditor({
   markers = [],
   onRun,
   revealLine,
+  persistView = false,
 }: {
   path: string;
   value: string;
@@ -63,6 +86,8 @@ export function CodeEditor({
   markers?: EditorMarker[];
   onRun?: () => void;
   revealLine?: { line: number; nonce: number } | null;
+  /** true 면 파일(path)별로 마지막 스크롤·커서 위치를 저장했다가 다시 열 때 되살린다 */
+  persistView?: boolean;
 }) {
   const { resolvedTheme } = useTheme();
   const fontSize = useSettings((s) => s.editorFontSize);
@@ -72,6 +97,25 @@ export function CodeEditor({
   useEffect(() => {
     runRef.current = onRun;
   }, [onRun]);
+  // cacheComponents 는 다른 페이지로 가면 이 화면을 지우지 않고 숨긴다(React Activity). 숨길 때 Monaco 가
+  // 에디터를 dispose 하는데 React 상태는 남아 있어서, 다시 보일 때 "InstantiationService has been disposed" 로
+  // 깨졌다. 숨겨질 때 key 를 바꿔 두면 다시 보일 때 새 에디터를 만든다 (내용은 value 로, 위치는 저장본으로 복원).
+  const [instance, setInstance] = useState(0);
+  useLayoutEffect(() => () => setInstance((n) => n + 1), []);
+  const pathRef = useRef(path);
+  const persistRef = useRef(persistView);
+  useEffect(() => {
+    persistRef.current = persistView;
+  }, [persistView]);
+
+  // 파일을 바꾸면 그 파일의 마지막 위치로 (라이브러리가 모델을 바꾼 뒤에 실행된다)
+  useEffect(() => {
+    pathRef.current = path;
+    const ed = editorRef.current;
+    if (!ed || !persistView) return;
+    const saved = readView(path);
+    if (saved) ed.restoreViewState(saved);
+  }, [path, persistView]);
 
   const language = path.endsWith(".py")
     ? "python"
@@ -118,6 +162,8 @@ export function CodeEditor({
 
   return (
     <Editor
+      key={instance}
+      keepCurrentModel
       path={path}
       value={value}
       language={language}
@@ -127,6 +173,20 @@ export function CodeEditor({
         editorRef.current = ed;
         monacoRef.current = monaco;
         ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => runRef.current?.());
+        if (persistRef.current) {
+          const saved = readView(pathRef.current);
+          if (saved) ed.restoreViewState(saved);
+          // 스크롤·커서가 움직이면 잠시 뒤 저장한다
+          let t: ReturnType<typeof setTimeout> | undefined;
+          const save = () => {
+            clearTimeout(t);
+            const p = pathRef.current;
+            t = setTimeout(() => persistRef.current && writeView(p, ed.saveViewState()), 250);
+          };
+          ed.onDidScrollChange(save);
+          ed.onDidChangeCursorPosition(save);
+          ed.onDidDispose(() => clearTimeout(t));
+        }
       }}
       onChange={(v) => onChange?.(v ?? "")}
       loading={<div className="grid h-full place-items-center text-xs text-muted">에디터 로딩 중…</div>}

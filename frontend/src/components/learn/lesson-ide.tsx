@@ -1,18 +1,22 @@
 "use client";
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState } from "react";
-import { Eye, FileCode2, FlaskConical, KeyRound, Play, RotateCcw, Square, X } from "lucide-react";
+import { Eye, FileCode2, FlaskConical, KeyRound, ListRestart, Play, RotateCcw, Square, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useProgress, useSettings } from "@/lib/settings";
-import { CodeEditor, type EditorMarker } from "@/components/ide/code-editor";
-import { RunPanel } from "@/components/ide/run-panel";
-import { parseTraceback, useRunner } from "@/components/ide/use-runner";
+import { clearSavedViews, CodeEditor, type EditorMarker } from "@/components/ide/code-editor";
+import { RunPanel, type RunTab } from "@/components/ide/run-panel";
+import { parseTraceback, useRunner, type RunSnapshot } from "@/components/ide/use-runner";
 import { SplitGroup, SplitHandle, SplitPanel } from "@/components/ui/split";
 
 export type LessonIDEHandle = { openSnippet: (code: string) => void };
 
 const tabLabel = (p: string) =>
   p === "exercise.py" ? "실습 과제" : p === "solution.py" ? "정답 코드" : p.replace(/^examples\//, "");
+
+/** 강의별로 저장하는 IDE 상태: 열린 탭, 보던 탭, 출력/트레이스 탭, 마지막 실행 결과 */
+type IDEState = { open: string[]; active: string; showSolution: boolean; runTab: RunTab; run: RunSnapshot | null };
+const MAX_SAVED_RUN = 1_500_000; // 실행 결과 저장 상한(문자). 넘으면 트레이스는 빼고 출력만 저장한다
 
 function orderFiles(paths: string[]) {
   const rank = (p: string) =>
@@ -23,6 +27,8 @@ function orderFiles(paths: string[]) {
 export const LessonIDE = forwardRef<LessonIDEHandle, { lessonId: string; files: Record<string, string>; requiresKey: boolean }>(
   function LessonIDE({ lessonId, files: original, requiresKey }, ref) {
     const storageKey = `agentlab-code:${lessonId}`;
+    const ideKey = `agentlab-ide:${lessonId}`;
+    const [runTab, setRunTab] = useState<RunTab>("output");
     const [files, setFiles] = useState<Record<string, string>>(original);
     const [hydrated, setHydrated] = useState(false);
     const [showSolution, setShowSolution] = useState(false);
@@ -37,18 +43,32 @@ export const LessonIDE = forwardRef<LessonIDEHandle, { lessonId: string; files: 
     const setOpenSettings = useSettings((s) => s.setOpen);
     const { done, toggle } = useProgress();
 
-    // 저장된 수정본 복원
+    // 저장된 수정본과 IDE 상태(탭, 마지막 실행 결과) 복원
     useEffect(() => {
+      let scratch: string[] = [];
       try {
         const saved = JSON.parse(localStorage.getItem(storageKey) || "null");
         if (saved && typeof saved === "object") {
           setFiles((f) => ({ ...f, ...saved }));
-          const scratch = Object.keys(saved).filter((k) => k.startsWith("scratch"));
+          scratch = Object.keys(saved).filter((k) => k.startsWith("scratch"));
           if (scratch.length) setOpen((o) => orderFiles([...new Set([...o, ...scratch])]));
         }
       } catch {}
+      try {
+        const st = JSON.parse(localStorage.getItem(ideKey) || "null") as Partial<IDEState> | null;
+        if (st && typeof st === "object") {
+          const exists = (p: string) => original[p] !== undefined || scratch.includes(p);
+          const open = Array.isArray(st.open) ? st.open.filter(exists) : [];
+          if (open.length) setOpen(orderFiles(open));
+          if (st.active && exists(st.active)) setActive(st.active);
+          if (st.showSolution) setShowSolution(true);
+          if (st.runTab === "output" || st.runTab === "trace") setRunTab(st.runTab);
+          if (st.run && Array.isArray(st.run.lines)) runner.restore({ ...st.run, trace: Array.isArray(st.run.trace) ? st.run.trace : [] });
+        }
+      } catch {}
       setHydrated(true);
-    }, [storageKey]);
+      // 처음 한 번만 복원한다
+    }, [storageKey, ideKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // 원본과 다른 파일만 저장
     useEffect(() => {
@@ -59,6 +79,32 @@ export const LessonIDE = forwardRef<LessonIDEHandle, { lessonId: string; files: 
         else localStorage.removeItem(storageKey);
       } catch {}
     }, [files, hydrated, original, storageKey]);
+
+    // 탭과 마지막 실행 결과 저장 (실행 중에는 끝난 뒤에 저장)
+    const running = runner.status === "running";
+    useEffect(() => {
+      if (!hydrated || running) return;
+      const run: RunSnapshot | null = runner.lines.length ? { lines: runner.lines, status: runner.status, meta: runner.meta, trace: runner.trace } : null;
+      const state: IDEState = { open, active, showSolution, runTab, run };
+      try {
+        let json = JSON.stringify(state);
+        if (json.length > MAX_SAVED_RUN && run) json = JSON.stringify({ ...state, run: { ...run, trace: [] } });
+        localStorage.setItem(ideKey, json);
+      } catch {}
+    }, [hydrated, running, open, active, showSolution, runTab, runner.lines, runner.status, runner.meta, runner.trace, ideKey]);
+
+    // 모든 파일을 원본으로 되돌린다 (직접 만든 scratch 파일과 저장된 위치도 지운다)
+    const resetAll = () => {
+      if (!confirm("이 강의의 모든 코드를 원본으로 되돌릴까요? 직접 고친 내용과 새로 만든 파일이 사라집니다.")) return;
+      setFiles(original);
+      const next = orderFiles(Object.keys(original).filter((p) => p.endsWith(".py") && p !== "solution.py"));
+      setOpen(next);
+      setActive(next[0] ?? Object.keys(original)[0]);
+      setShowSolution(false);
+      setMarkers({});
+      clearSavedViews(`${lessonId}/`);
+    };
+    const anyModified = Object.keys(files).some((p) => original[p] !== files[p]);
 
     useImperativeHandle(ref, () => ({
       openSnippet: (code: string) => {
@@ -176,6 +222,14 @@ export const LessonIDE = forwardRef<LessonIDEHandle, { lessonId: string; files: 
               </button>
             )}
             <button
+              onClick={resetAll}
+              disabled={!anyModified}
+              className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-muted hover:bg-surface-3 hover:text-fg disabled:opacity-30"
+              title="이 강의의 모든 코드를 원본으로 되돌리기"
+            >
+              <ListRestart className="h-3.5 w-3.5" /> 전체 초기화
+            </button>
+            <button
               onClick={() => original[active] !== undefined && setFiles((f) => ({ ...f, [active]: original[active] }))}
               disabled={!isModified(active)}
               className="rounded-md p-1.5 text-muted hover:bg-surface-3 hover:text-fg disabled:opacity-30"
@@ -221,6 +275,7 @@ export const LessonIDE = forwardRef<LessonIDEHandle, { lessonId: string; files: 
                 markers={markers[active]}
                 onRun={run}
                 revealLine={reveal}
+                persistView
               />
             ) : (
               <div className="grid h-full place-items-center text-sm text-muted">파일을 선택하세요</div>
@@ -228,7 +283,7 @@ export const LessonIDE = forwardRef<LessonIDEHandle, { lessonId: string; files: 
           </SplitPanel>
           <SplitHandle vertical />
           <SplitPanel defaultSize="36" minSize="10">
-            <RunPanel runner={runner} onJump={jump} />
+            <RunPanel runner={runner} onJump={jump} tab={runTab} onTab={setRunTab} />
           </SplitPanel>
         </SplitGroup>
       </div>

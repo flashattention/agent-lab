@@ -26,7 +26,11 @@ export function LessonView({ lesson, curriculum }: { lesson: Lesson; curriculum:
   const { done, toggle } = useProgress();
   const mounted = useMounted();
   const [toc, setToc] = useState(false);
-  useEffect(() => scroller.current?.scrollTo({ top: 0 }), [lesson.id]);
+  // 최신 Chrome 에서 scrollTo() 는 Promise 를 돌려준다. 화살표 함수로 바로 반환하면 React 가 그 Promise 를
+  // 정리 함수로 호출하다 "destroy is not a function" 으로 페이지가 깨지므로 반드시 블록으로 감싼다.
+  useEffect(() => {
+    scroller.current?.scrollTo({ top: 0 });
+  }, [lesson.id]);
   const isDone = mounted && !!done[lesson.id];
 
   return (

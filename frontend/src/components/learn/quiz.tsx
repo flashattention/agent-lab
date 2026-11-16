@@ -1,14 +1,19 @@
 "use client";
 
-import { useState } from "react";
 import { CheckCircle2, CircleHelp, RotateCcw, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useProgress } from "@/lib/settings";
+import { useMounted } from "@/lib/use-mounted";
 import type { QuizItem } from "@/lib/content";
 
 export function Quiz({ lessonId, items }: { lessonId: string; items: QuizItem[] }) {
-  const [picked, setPicked] = useState<(number | null)[]>(() => items.map(() => null));
+  // 고른 답은 브라우저에 저장해 두고, 강의에 다시 들어오면 그대로 보여 준다
+  const mounted = useMounted();
+  const saved = useProgress((s) => s.answers[lessonId]);
+  const setAnswers = useProgress((s) => s.setAnswers);
   const setQuiz = useProgress((s) => s.setQuiz);
+  const picked: (number | null)[] = mounted && saved?.length === items.length ? saved : items.map(() => null);
+  const setPicked = (next: (number | null)[] | null) => setAnswers(lessonId, next);
   const answered = picked.filter((p) => p !== null).length;
   const correct = picked.filter((p, i) => p === items[i].answer).length;
 
@@ -30,7 +35,7 @@ export function Quiz({ lessonId, items }: { lessonId: string; items: QuizItem[] 
           {answered}/{items.length} · 정답 {correct}
         </span>
         {answered > 0 && (
-          <button onClick={() => setPicked(items.map(() => null))} className="rounded p-1 text-muted hover:text-fg" title="다시 풀기">
+          <button onClick={() => setPicked(null)} className="rounded p-1 text-muted hover:text-fg" title="다시 풀기">
             <RotateCcw className="h-3.5 w-3.5" />
           </button>
         )}

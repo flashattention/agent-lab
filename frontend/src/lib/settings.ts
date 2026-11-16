@@ -60,8 +60,10 @@ export const useSettings = create<Settings>()(
 type Progress = {
   done: Record<string, number>; // lessonId → 완료 시각
   quiz: Record<string, number>; // lessonId → 맞힌 개수
+  answers: Record<string, (number | null)[]>; // lessonId → 문항별로 고른 보기 (안 풀었으면 null)
   toggle: (id: string) => void;
   setQuiz: (id: string, score: number) => void;
+  setAnswers: (id: string, picked: (number | null)[] | null) => void;
 };
 
 export const useProgress = create<Progress>()(
@@ -69,6 +71,7 @@ export const useProgress = create<Progress>()(
     (set) => ({
       done: {},
       quiz: {},
+      answers: {},
       toggle: (id) =>
         set((s) => {
           const done = { ...s.done };
@@ -77,6 +80,13 @@ export const useProgress = create<Progress>()(
           return { done };
         }),
       setQuiz: (id, score) => set((s) => ({ quiz: { ...s.quiz, [id]: score } })),
+      setAnswers: (id, picked) =>
+        set((s) => {
+          const answers = { ...s.answers };
+          if (picked) answers[id] = picked;
+          else delete answers[id];
+          return { answers };
+        }),
     }),
     { name: "agentlab-progress" },
   ),
