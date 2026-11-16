@@ -129,3 +129,32 @@ cd backend && uv run python scripts/eval_defects.py /tmp/defects.json --json ../
 OPENAI_API_KEY=sk-... uv run python scripts/eval_patterns.py --live --runs 1 --json ../docs/eval/patterns-live.json
 AGENTLAB_MAX_TIMEOUT=180 OPENAI_API_KEY=sk-... uv run python scripts/eval_patterns.py --live --runs 1 --timeout 180   # 상한을 늘려 재측정
 ```
+
+## 5. LLM 고도화 프롬프트: 전체 재작성(v1) vs 필요한 만큼만(v2)
+
+**바꾼 것.** 고도화 프롬프트를 v1 에서 v2 로 바꿨습니다(`backend/app/refine.py`, `PROMPT_VERSION = "2"`).
+
+| | v1 (이전) | v2 (현재) |
+|---|---|---|
+| 지시 | "production-quality 로 다시 써라", 모든 곳에 docstring·타입 힌트 | 문제를 먼저 찾고, 그 문제에 필요한 만큼만 고친다. 새 기능·추상화·설정·의존성 금지 |
+| 응답 형식 | 모든 파일을 다시 출력 | **바뀐 파일만** 출력, 빠진 파일은 원본 유지. 바꿀 것이 없으면 `{"files": {}}` |
+| 성공 기준 | 요구 사항 목록 | ruff·Mock 실행·보안 정책을 성공 기준으로 명시하고, 실패하면 보고서를 되돌려 준다 (기존과 같음) |
+| 변경 기록 | 자유 요약 | 한 줄에 하나씩 `파일: 무엇을 → 왜` |
+
+근거는 Karpathy 의 LLM 코딩 함정 관찰을 정리한 지침(가정 드러내기, 단순함, 필요한 만큼만 고치기, 검증 가능한 목표)입니다. v1 은 "다시 써라"와 "모든 곳에"라는 표현 때문에 과잉 수정을 부추기고, 출력 토큰이 고친 양이 아니라 프로젝트 크기에 비례했습니다. 캐시 키에 `PROMPT_VERSION` 이 들어가므로 두 프롬프트의 결과는 섞이지 않습니다.
+
+**측정 방법.** `scripts/eval_refine.py` 가 같은 패턴(fixture 의 생성 코드와 정규화 그래프, 운영 요청과 같은 입력)을 두 프롬프트로 캐시 없이 고도화하고 비교합니다. 지표는 검증 통과율, 시도 횟수, 입력·출력 토큰, 걸린 시간, 바뀐 파일 수, 바뀐 줄 수(추가+삭제), 전체 줄 수 변화입니다.
+
+**측정 장치 검증.** 실제 모델 대신 가짜 OpenAI 서버(v1 이면 모든 파일을, v2 면 한 파일을 고쳐 보냄)로 3개 패턴을 끝까지 돌려, 모든 응답이 실제 ruff·Mock 실행 검증을 거치고 지표가 차이를 올바르게 잡는 것을 확인했습니다. 이 결과는 프롬프트의 효과가 아니라 측정 장치가 동작한다는 확인입니다.
+
+**실측 결과: 아직 측정 전입니다.** 실제 모델 호출이 필요합니다. 아래 명령으로 측정한 뒤 이 절에 표를 채웁니다.
+
+```bash
+cd backend
+OPENAI_API_KEY=sk-... uv run python scripts/eval_refine.py --json ../docs/eval/refine.json            # 패턴 13종 × v1·v2
+OPENAI_API_KEY=sk-... uv run python scripts/eval_refine.py --patterns react-agent,supervisor          # 먼저 작게
+```
+
+호출 수는 패턴 13종 × 2개 프롬프트 × 1~3회(검증 실패 시 재시도)입니다. 호출 1회의 입력은 프로젝트 크기만큼(대략 수천 토큰) 듭니다. v1 은 출력도 비슷한 크기이고, v2 는 고친 양만큼 듭니다.
+
+**판단 기준.** v2 를 유지하려면 통과율이 v1 이상이어야 하고, 출력 토큰과 바뀐 줄 수가 줄어야 합니다. 통과율이 떨어지면 v2 가 너무 소극적이라는 뜻이니, 작업 순서 1단계(문제 찾기)의 범위를 넓혀 다시 잽니다.

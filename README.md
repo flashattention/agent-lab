@@ -36,7 +36,7 @@
 | 실제 모델(gpt-5-mini) 실행 | **10/12** (실패 2건은 90초 실행 상한 초과, 코드 오류 아님) | [EVAL.md §4](docs/EVAL.md#4-실제-모델-gpt-5-mini-패턴-12종--1회) |
 | 구조 분석기 결함 검출률 | **97/97**, 정상 변경 오탐 **0/48** | [EVAL.md §2](docs/EVAL.md#2-구조-분석기-결함-주입-실험) |
 | 분석기가 없을 때 결함의 결과 | 예외 57% · 무한 루프 11% · **아무 증상 없음 32%** | [EVAL.md §3](docs/EVAL.md#3-분석기가-막지-않았다면) |
-| 자동 테스트 | 백엔드 71 · 프론트엔드 89 · DB 권한 22 · 강의 코드 162 | [CI](.github/workflows/ci.yml) |
+| 자동 테스트 | 백엔드 79 · 프론트엔드 89 · DB 권한 22 · 강의 코드 162 | [CI](.github/workflows/ci.yml) |
 | 정적 검사 | ruff · ESLint · tsc 경고 0 | CI |
 
 ## 아키텍처
@@ -116,12 +116,12 @@ backend/
   app/runner.py            샌드박스 실행 (rlimit, 타임아웃, 출력 상한, 트레이스 파이프)
   app/keyproxy.py          API 키 주입 프록시
   app/validate.py          ruff + Mock 실행 검증
-  app/refine.py            LLM 고도화 → 검증 → 보안 정책 → 구조 해시 캐시
+  app/refine.py            LLM 고도화(바뀐 파일만) → 검증 → 보안 정책 → 구조 해시 캐시
   app/policy.py            고도화 코드 보안 정책 (AST 허용 목록)
   app/auth.py              Supabase 토큰 확인 · 하루 한도
   sandbox/                 Mock LLM, 실행 트레이서, 보안 정책 agentlab_guard (샌드박스 안에서 자동 로드)
   tests/                   pytest (fixtures/patterns.json: 프론트 생성 코드)
-  scripts/                 강의 코드 검증 · eval
+  scripts/                 강의 코드 검증 · eval (패턴 · 결함 주입 · 고도화 프롬프트 비교)
 docs/                      아키텍처 · 설계 결정 · eval · 현업 준비(PRODUCTION_READINESS) · 스크린샷
 supabase/schema.sql        projects · agent_presets(마켓) 테이블 · RLS 정책
 supabase/tests/            스키마 · RLS · 권한 테스트 (Postgres 에서 실행)
@@ -217,6 +217,7 @@ eval 재현 방법은 [docs/EVAL.md](docs/EVAL.md)에 있습니다.
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 요청 흐름, 샌드박스, 키 프록시, 트레이스, 코드 생성, 캐시, 품질 체계 |
 | [docs/DECISIONS.md](docs/DECISIONS.md) | 설계 결정, 버린 대안, 대가 |
 | [docs/EVAL.md](docs/EVAL.md) | 패턴 실행, 결함 주입, 런타임 영향 측정 |
+| [CLAUDE.md](CLAUDE.md) | AI 코딩 에이전트·기여자를 위한 작업 지침과 완료 기준 |
 | [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md) | 현업 사용을 위한 기능·보안 점검, 구현 내역, 후속 과제 |
 | [DEPLOY.md](DEPLOY.md) | Vercel + Cloud Run + Supabase 배포 절차와 비용 |
 | [CURRICULUM.md](CURRICULUM.md) · [CONTENT_GUIDE.md](CONTENT_GUIDE.md) | 강의 구성과 작성 규칙 |
