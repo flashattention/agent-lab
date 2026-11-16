@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { runCode, type RunEvent } from "@/lib/api";
+import type { TraceEvent } from "@/lib/trace";
 
 export type ConsoleLine = { kind: "stdout" | "stderr" | "info" | "error" | "success"; text: string };
 export type RunStatus = "idle" | "running" | "ok" | "error";
@@ -31,6 +32,21 @@ export function useRunner() {
   const [meta, setMeta] = useState<{ mock?: boolean; duration?: number; code?: number } | null>(null);
   const [stderrAll, setStderrAll] = useState("");
   const abortRef = useRef<AbortController | null>(null);
+  // 트레이스 이벤트는 많이 올 수 있으므로 모아 두었다가 프레임마다 한 번만 반영한다
+  const [trace, setTrace] = useState<TraceEvent[]>([]);
+  const traceBuf = useRef<TraceEvent[]>([]);
+  const traceFrame = useRef<number | null>(null);
+  const flushTrace = useCallback(() => {
+    traceFrame.current = null;
+    setTrace(traceBuf.current.slice());
+  }, []);
+  const pushTrace = useCallback(
+    (e: TraceEvent) => {
+      traceBuf.current.push(e);
+      if (traceFrame.current == null) traceFrame.current = requestAnimationFrame(flushTrace);
+    },
+    [flushTrace],
+  );
 
   const push = (kind: ConsoleLine["kind"], text: string) =>
     setLines((prev) => {
@@ -42,7 +58,7 @@ export function useRunner() {
       return [...prev, { kind, text }];
     });
 
-  const run = useCallback(async (files: Record<string, string>, entry: string, opts: { timeout?: number } = {}) => {
+  const run = useCallback(async (files: Record<string, string>, entry: string, opts: { timeout?: number; noKey?: boolean } = {}) => {
     abortRef.current?.abort();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
@@ -50,6 +66,8 @@ export function useRunner() {
     setStatus("running");
     setMeta(null);
     setStderrAll("");
+    traceBuf.current = [];
+    setTrace([]);
     let stderr = "";
     let final = "error" as RunStatus;
     try {
@@ -57,7 +75,8 @@ export function useRunner() {
         files,
         entry,
         (e: RunEvent) => {
-          if (e.type === "stdout") push("stdout", e.data);
+          if (e.type === "trace") pushTrace(e.event);
+          else if (e.type === "stdout") push("stdout", e.data);
           else if (e.type === "stderr") {
             stderr += e.data;
             if (e.data.startsWith("[AgentLab] OPENAI_API_KEY 없음")) push("info", "ⓘ Mock LLM 모드 — 설정에서 API Key를 넣으면 실제 GPT로 실행됩니다.\n");
@@ -69,7 +88,7 @@ export function useRunner() {
             push(e.code === 0 ? "success" : "error", `\n${e.code === 0 ? "✓" : "✗"} 종료 코드 ${e.code} · ${(e.duration_ms / 1000).toFixed(2)}s\n`);
           } else if (e.type === "error") push("error", e.message + "\n");
         },
-        { signal: ctrl.signal, timeout: opts.timeout },
+        { signal: ctrl.signal, timeout: opts.timeout, noKey: opts.noKey },
       );
     } catch (e) {
       if ((e as Error).name === "AbortError") {
@@ -77,17 +96,21 @@ export function useRunner() {
         final = "idle";
       } else push("error", String(e));
     }
+    if (traceFrame.current != null) cancelAnimationFrame(traceFrame.current);
+    flushTrace();
     setStderrAll(stderr);
     setStatus(final);
     return { ok: final === "ok", stderr };
-  }, []);
+  }, [flushTrace, pushTrace]);
 
   const stop = useCallback(() => abortRef.current?.abort(), []);
   const clear = useCallback(() => {
     setLines([]);
     setStatus("idle");
     setMeta(null);
+    traceBuf.current = [];
+    setTrace([]);
   }, []);
 
-  return { lines, status, meta, run, stop, clear, stderrAll };
+  return { lines, status, meta, run, stop, clear, stderrAll, trace };
 }

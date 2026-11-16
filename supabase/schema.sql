@@ -29,6 +29,11 @@ drop trigger if exists projects_touch on public.projects;
 create trigger projects_touch before update on public.projects
 for each row execute function public.touch_updated_at();
 
+-- Data API 권한: "Automatically expose new tables"를 꺼 둔 경우에도 동작하도록 직접 부여한다.
+-- 실제로 어떤 행에 접근할 수 있는지는 아래 RLS 정책이 결정한다.
+grant select on public.projects to anon;                                   -- 공유 링크 보기 (비로그인)
+grant select, insert, update, delete on public.projects to authenticated;  -- 로그인 사용자
+
 -- 행 단위 보안: 주인은 전부 가능, 그 외에는 공개된 프로젝트를 읽기만 가능
 alter table public.projects enable row level security;
 

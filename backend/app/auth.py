@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import os
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 from fastapi import HTTPException, Request
@@ -59,8 +59,8 @@ async def require_user(req: Request) -> str | None:
         return hit[0]
     try:
         user_id = await _fetch_user_id(token)
-    except httpx.HTTPError:
-        raise HTTPException(503, "로그인 확인 서버에 연결할 수 없습니다. 잠시 후 다시 시도하세요.")
+    except httpx.HTTPError as e:
+        raise HTTPException(503, "로그인 확인 서버에 연결할 수 없습니다. 잠시 후 다시 시도하세요.") from e
     if not user_id:
         _tokens.pop(token, None)
         raise HTTPException(401, "로그인이 만료되었습니다. 다시 로그인하세요.")
@@ -75,7 +75,7 @@ def daily_limit(user_id: str | None, bucket: str) -> None:
     """사용자별 하루(UTC) 횟수 제한. 서버 인스턴스의 메모리에만 기록하므로 재시작하면 초기화된다."""
     if user_id is None:
         return
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
     key = (user_id, bucket, today)
     used = _usage.get(key, 0)
     if used >= DAILY_LIMITS[bucket]:

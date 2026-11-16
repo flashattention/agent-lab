@@ -16,17 +16,17 @@ const defineThemes: BeforeMount = (monaco) => {
     inherit: true,
     rules: [
       { token: "comment", foreground: "6b6b78", fontStyle: "italic" },
-      { token: "keyword", foreground: "c4b5fd" },
+      { token: "keyword", foreground: "ffffff", fontStyle: "bold" },
       { token: "string", foreground: "6ee7b7" },
       { token: "number", foreground: "fcd34d" },
     ],
     colors: {
-      "editor.background": "#0e0e12",
-      "editor.lineHighlightBackground": "#18181c",
-      "editorLineNumber.foreground": "#3f3f46",
-      "editorLineNumber.activeForeground": "#a1a1aa",
-      "editorGutter.background": "#0e0e12",
-      "editor.selectionBackground": "#4c1d9566",
+      "editor.background": "#0a0a0a",
+      "editor.lineHighlightBackground": "#161616",
+      "editorLineNumber.foreground": "#3a3a3a",
+      "editorLineNumber.activeForeground": "#a3a3a3",
+      "editorGutter.background": "#0a0a0a",
+      "editor.selectionBackground": "#ffffff2e",
     },
   });
   monaco.editor.defineTheme("agentlab-light", {
@@ -34,15 +34,15 @@ const defineThemes: BeforeMount = (monaco) => {
     inherit: true,
     rules: [
       { token: "comment", foreground: "8a8a95", fontStyle: "italic" },
-      { token: "keyword", foreground: "7c3aed" },
+      { token: "keyword", foreground: "0a0a0a", fontStyle: "bold" },
       { token: "string", foreground: "059669" },
       { token: "number", foreground: "d97706" },
     ],
     colors: {
-      "editor.background": "#fcfcfd",
-      "editor.lineHighlightBackground": "#f4f4f5",
-      "editorLineNumber.foreground": "#c4c4cc",
-      "editorGutter.background": "#fcfcfd",
+      "editor.background": "#ffffff",
+      "editor.lineHighlightBackground": "#f5f5f5",
+      "editorLineNumber.foreground": "#cccccc",
+      "editorGutter.background": "#ffffff",
     },
   });
 };

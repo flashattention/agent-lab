@@ -4,6 +4,7 @@ import { generateProject } from "../src/lib/playground/codegen.ts";
 import { analyze } from "../src/lib/playground/analyze.ts";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
 
 const API = process.env.API ?? "http://localhost:8000";
 const only = process.argv[2];
@@ -11,7 +12,7 @@ let fails = 0;
 for (const p of PATTERNS.filter((x) => !only || x.id === only)) {
   const a = analyze(p.graph);
   const files = generateProject(p.graph);
-  const out = join(process.env.OUT ?? "/private/tmp/claude-501/patterns", p.id);
+  const out = join(process.env.OUT ?? join(tmpdir(), "agentlab-patterns"), p.id);
   for (const [f, c] of Object.entries(files)) { mkdirSync(dirname(join(out, f)), { recursive: true }); writeFileSync(join(out, f), c); }
   const res = await fetch(`${API}/api/validate`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ files }) });
   const r = await res.json();

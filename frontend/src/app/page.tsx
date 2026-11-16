@@ -46,7 +46,9 @@ export default async function Home() {
       <section className="border-b border-border">
         <div className="mx-auto grid max-w-6xl items-center gap-12 px-6 py-16 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:py-24">
           <div className="min-w-0">
-            <h1 className="text-4xl leading-[1.2] font-bold tracking-tight text-balance md:text-5xl md:leading-[1.15]">에이전트를 그리면 실행되는 LangGraph 코드가 됩니다</h1>
+            <h1 className="text-4xl leading-[1.2] font-bold tracking-tight text-balance md:text-5xl md:leading-[1.15]">
+              에이전트를 <span className="hl-pink">그리면</span> 실행되는 <span className="hl">LangGraph 코드</span>가 됩니다
+            </h1>
             <p className="mt-5 max-w-xl text-[17px] leading-relaxed text-muted">
               AgentLab은 AI 에이전트를 설계하는 작업 공간입니다. 노드를 잇는 동안 코드가 만들어지고, 구조 오류는 실행하기 전에 드러납니다. 큰 시스템은 서브 에이전트로 나눠 만들고, 잘 만든 에이전트는 프리셋으로 다시 씁니다.
             </p>
@@ -184,6 +186,14 @@ export default async function Home() {
 
       <footer className="border-t border-border px-6 py-8 text-center text-xs leading-relaxed text-muted">
         AgentLab. 코드는 네트워크가 제한된 샌드박스에서 실행되고, OpenAI API Key는 브라우저에만 보관되며 서버에 저장되지 않습니다.
+        <div className="mt-2 flex justify-center gap-4">
+          <Link href="/privacy" className="hover:text-fg">
+            개인정보처리방침
+          </Link>
+          <Link href="/terms" className="hover:text-fg">
+            서비스 약관
+          </Link>
+        </div>
       </footer>
     </main>
   );

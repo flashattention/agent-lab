@@ -42,9 +42,21 @@ export function ProjectsView() {
     }
   }, [user]);
 
+  // 로그인한 사용자가 바뀌면 목록을 다시 불러온다
   useEffect(() => {
-    load();
-  }, [load]);
+    if (!user) return;
+    let alive = true;
+    listProjects(user.id)
+      .then((list) => {
+        if (!alive) return;
+        setItems(list);
+        setError("");
+      })
+      .catch((e) => alive && setError((e as Error).message));
+    return () => {
+      alive = false;
+    };
+  }, [user]);
 
   useEffect(() => {
     if (!toast) return;

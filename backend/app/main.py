@@ -40,6 +40,8 @@ async def limit_body(request: Request, call_next):
     if length and length.isdigit() and int(length) > MAX_BODY:
         return JSONResponse({"detail": f"요청이 너무 큽니다 (최대 {MAX_BODY // 1024 // 1024}MB)."}, status_code=413)
     return await call_next(request)
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -64,6 +66,8 @@ _hits: dict[tuple[str, str], deque] = defaultdict(deque)
 
 
 def _client_ip(req: Request) -> str:
+    """요청한 클라이언트 IP. X-Forwarded-For 의 맨 앞 값은 클라이언트가 마음대로 넣을 수 있으므로,
+    신뢰하는 프록시(Cloud Run 등)가 덧붙인 오른쪽 값만 쓴다 (AGENTLAB_TRUSTED_PROXY_HOPS)."""
     direct = req.client.host if req.client else "?"
     fwd = [p.strip() for p in (req.headers.get("x-forwarded-for") or "").split(",") if p.strip()]
     if TRUSTED_HOPS <= 0 or not fwd:
@@ -126,9 +130,7 @@ async def run(req: Request, body: RunRequest):
 
     async def gen():
         try:
-            async for ev in stream_run(
-                body.files, body.entry, api_key=api_key, model=body.model, timeout=body.timeout, stdin=body.stdin
-            ):
+            async for ev in stream_run(body.files, body.entry, api_key=api_key, model=body.model, timeout=body.timeout, stdin=body.stdin):
                 yield json.dumps(ev, ensure_ascii=False) + "\n"
         except RunError as e:
             yield json.dumps({"type": "error", "message": str(e)}, ensure_ascii=False) + "\n"
@@ -143,7 +145,7 @@ async def validate_route(req: Request, body: ValidateRequest):
     try:
         return await validate(body.files, body.entry)
     except RunError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
 
 
 @app.post("/api/refine")
@@ -153,9 +155,9 @@ async def refine_route(req: Request, body: RefineRequest):
     try:
         return await refine(body.graph, body.files, _key(req), body.model)
     except RunError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
     except Exception as e:  # OpenAI 오류 등
-        raise HTTPException(502, f"LLM 호출 실패: {type(e).__name__}: {e}")
+        raise HTTPException(502, f"LLM 호출 실패: {type(e).__name__}: {e}") from e
 
 
 @app.post("/api/refine/cached")
@@ -181,9 +183,13 @@ async def models(req: Request):
     try:
         res = await AsyncOpenAI(api_key=api_key).models.list()
     except Exception as e:
-        raise HTTPException(400, f"키 확인 실패: {e}")
+        raise HTTPException(400, f"키 확인 실패: {e}") from e
     ids = sorted(
-        (m.id for m in res.data if m.id.startswith(("gpt-", "o")) and not any(x in m.id for x in ("audio", "realtime", "tts", "transcribe", "image", "search"))),
+        (
+            m.id
+            for m in res.data
+            if m.id.startswith(("gpt-", "o")) and not any(x in m.id for x in ("audio", "realtime", "tts", "transcribe", "image", "search"))
+        ),
         reverse=True,
     )
     return {"models": ids}

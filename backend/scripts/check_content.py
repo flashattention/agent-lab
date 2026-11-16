@@ -18,8 +18,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.runner import run_collect  # noqa: E402
-from app.validate import lint  # noqa: E402
+from app.runner import run_collect
+from app.validate import lint
 
 ROOT = Path(__file__).resolve().parents[2] / "frontend" / "content" / "learn"
 
@@ -45,9 +45,9 @@ async def check_lesson(lesson: Path, sem: asyncio.Semaphore) -> list[tuple[str, 
 async def main(filt: str | None):
     lessons = sorted({p.parent for p in ROOT.rglob("lesson.md")})
     if filt:
-        lessons = [l for l in lessons if filt in str(l)]
+        lessons = [lesson for lesson in lessons if filt in str(lesson)]
     sem = asyncio.Semaphore(6)
-    all_res = await asyncio.gather(*(check_lesson(l, sem) for l in lessons))
+    all_res = await asyncio.gather(*(check_lesson(lesson, sem) for lesson in lessons))
     fails = 0
     for res in all_res:
         for name, ok, msg in res:

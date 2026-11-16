@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Eye, EyeOff, Loader2, ShieldCheck, X } from "lucide-react";
+import { ExternalLink, Eye, EyeOff, Loader2, ShieldCheck, Trash2, X } from "lucide-react";
 import { useSettings } from "@/lib/settings";
 import { listModels } from "@/lib/api";
 
@@ -74,15 +74,48 @@ export function SettingsDialog() {
           </button>
         </div>
         {msg && <p className={`mt-1.5 text-xs ${status === "error" ? "text-danger" : "text-success"}`}>{msg}</p>}
-        <p className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-muted">
-          <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          {s.rememberKey ? "키는 이 브라우저(localStorage)에 저장됩니다." : "키는 이 탭에만 보관되고 탭을 닫으면 지워집니다."} 코드 실행 요청 시에만 서버로 전달되고, 서버는 키를 저장하지
-          않습니다. 실행 샌드박스는 OpenAI 외의 주소로 연결할 수 없습니다. 키가 없으면 모든 예제가 <b className="text-fg-2">Mock LLM 모드</b>로 실행됩니다(흐름 검증용 모의 응답).
-        </p>
+        {s.apiKey && (
+          <button onClick={() => { s.set({ apiKey: "" }); setStatus("idle"); setMsg(""); }} className="mt-1.5 flex items-center gap-1 text-[11px] text-muted hover:text-danger">
+            <Trash2 className="h-3 w-3" /> 키 지우기
+          </button>
+        )}
+
         <label className="mt-2 flex items-center gap-2 text-xs text-fg-2">
           <input type="checkbox" checked={s.rememberKey} onChange={(e) => s.set({ rememberKey: e.target.checked })} className="accent-[var(--accent)]" />
           이 브라우저에 계속 기억 (공용 PC 에서는 끄세요)
         </label>
+
+        <div className="mt-3 rounded-xl border border-border bg-surface-2/60 p-3 text-xs leading-relaxed text-muted">
+          <div className="mb-1.5 flex items-center gap-1.5 font-semibold text-fg-2">
+            <ShieldCheck className="h-3.5 w-3.5 text-success" /> 키는 이렇게 다뤄집니다
+          </div>
+          <ul className="list-disc space-y-1 pl-4">
+            <li>
+              {s.rememberKey ? "이 브라우저(localStorage)에 저장되고" : "이 탭에만 보관되어 탭을 닫으면 지워지고"}, ▶ 실행할 때만 서버로 전달됩니다. 서버는 키를 저장하거나 기록하지 않습니다.
+            </li>
+            <li>
+              실행되는 코드에는 <b className="text-fg-2">진짜 키가 전달되지 않습니다.</b> 서버의 키 프록시가 OpenAI 추론 API 요청에만 키를 붙여 주므로,
+              공유받은 코드라도 키 문자열을 빼낼 수 없습니다.{" "}
+              <a href="https://github.com/flashattention/agent-lab/blob/main/backend/app/keyproxy.py" target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-accent hover:underline">
+                코드 보기 <ExternalLink className="h-3 w-3" />
+              </a>
+            </li>
+            <li>실행 샌드박스는 키 프록시 외의 주소로 연결할 수 없고, 외부 프로그램도 실행할 수 없습니다.</li>
+            <li>키가 없으면 모든 예제가 <b className="text-fg-2">Mock LLM 모드</b>로 실행됩니다(흐름 검증용 모의 응답).</li>
+          </ul>
+          <div className="mt-2.5 rounded-lg bg-warning/10 px-2.5 py-2 text-warning">
+            <b>권장:</b> 이 서비스 전용 키를 새로 만들어 쓰세요. OpenAI에서 새 프로젝트를 만들고 <b>월 사용 한도</b>를 건 뒤, 그 프로젝트의 키를 발급하면
+            만약의 경우에도 피해가 한도 안으로 제한되고, 언제든 키만 삭제하면 됩니다.
+            <span className="mt-1 flex flex-wrap gap-x-3">
+              <a href="https://platform.openai.com/settings/organization/projects" target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 font-medium underline">
+                프로젝트·한도 설정 <ExternalLink className="h-3 w-3" />
+              </a>
+              <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 font-medium underline">
+                API 키 발급 <ExternalLink className="h-3 w-3" />
+              </a>
+            </span>
+          </div>
+        </div>
 
         <div className="mt-5 grid grid-cols-2 gap-4">
           <div>

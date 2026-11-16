@@ -55,7 +55,21 @@ ALLOWED_IMPORTS = {
     "os",  # 아래에서 os.getenv/os.environ.get(리터럴) 만 허용
 }
 
-FORBIDDEN_CALLS = {"eval", "exec", "compile", "__import__", "open", "globals", "vars", "locals", "breakpoint", "input", "memoryview", "setattr", "delattr"}
+FORBIDDEN_CALLS = {
+    "eval",
+    "exec",
+    "compile",
+    "__import__",
+    "open",
+    "globals",
+    "vars",
+    "locals",
+    "breakpoint",
+    "input",
+    "memoryview",
+    "setattr",
+    "delattr",
+}
 SAFE_DUNDERS = {"__name__", "__doc__", "__init__", "__all__", "__file__", "__class__", "__future__", "__main__"}
 SECRET_WORDS = ("KEY", "TOKEN", "SECRET", "PASSWORD", "CREDENTIAL")
 OS_ALLOWED = {"getenv", "environ"}
@@ -130,7 +144,7 @@ def check_source(path: str, source: str) -> list[dict]:
                 via_get = isinstance(par, ast.Attribute) and par.attr == "get" and isinstance(parents.get(id(par)), ast.Call)
                 via_sub = isinstance(par, ast.Subscript) and par.value is node
                 if not (via_get or via_sub):
-                    bad(node, "env", "os.environ 은 .get(\"이름\") 또는 [\"이름\"] 로만 사용할 수 있습니다")
+                    bad(node, "env", 'os.environ 은 .get("이름") 또는 ["이름"] 로만 사용할 수 있습니다')
         elif isinstance(node, ast.Subscript):
             # os.environ["X"] (읽기/쓰기 모두) 는 리터럴 + 비밀 아님만
             v = node.value

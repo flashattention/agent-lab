@@ -33,9 +33,10 @@ AgentLab 플레이그라운드는 학습용 도구로 출발했습니다. 현업
 - `subprocess` 로 `curl` 등 외부 바이너리 실행
 
 **조치 (구현).** `sandbox/sitecustomize.py` 에 [PEP 578 audit hook](https://peps.python.org/pep-0578/) 을 설치합니다. audit hook 은 한 번 설치되면 파이썬 코드로 제거할 수 없습니다.
-- `socket.connect` / `socket.getaddrinfo`: 허용 목록 호스트(기본 `api.openai.com`, `AGENTLAB_EGRESS_ALLOW` 로 추가)만 통과시킵니다. 사설·링크로컬·루프백·메타데이터 주소는 이름 해석 결과까지 확인해 차단합니다.
+- `socket.connect` / `socket.getaddrinfo`: 키 주입 프록시 주소(`127.0.0.1:<port>`, 실행마다 정확히 하나)와 `AGENTLAB_EGRESS_ALLOW` 로 지정한 호스트만 통과시킵니다(기본은 프록시뿐). 사설·링크로컬·루프백·메타데이터 주소는 이름 해석 결과까지 확인해 차단합니다.
+- 키 주입 프록시(`app/keyproxy.py`)와 역할이 나뉩니다. 프록시는 **키 문자열 노출**을, 가드는 **메타데이터 접근·데이터 반출**을 막습니다.
 - Mock 모드(키 없음)에서는 외부 통신 전체를 차단합니다.
-- `subprocess.Popen`, `os.system`, `os.exec*`, `os.posix_spawn`, `os.fork`, `pty.spawn` 을 차단합니다.
+- `os.system`, `os.exec*`, `os.fork`, `pty.spawn` 을 차단합니다. `subprocess.Popen`·`os.posix_spawn` 은 샌드박스 자신의 파이썬만 허용하고(강의 예제가 쓰는 `python -I`), `env={}` 로 환경을 비워도 정책 활성화 플래그를 넣어 자식에게도 정책이 걸리게 합니다.
 - 차단 시 사용자가 원인을 알 수 있게 `[AgentLab] 보안 정책: ...` 메시지와 함께 `PermissionError` 를 냅니다.
 
 **한계와 후속 과제 (📋).** audit hook 은 `ctypes` 로 libc 를 직접 호출하면 우회할 수 있습니다. 공개 운영에서는 아래 인프라 격리를 함께 해야 합니다.
@@ -166,7 +167,7 @@ Next.js 응답에 `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `R
 
 | 변수 | 기본값 | 설명 |
 | --- | --- | --- |
-| `AGENTLAB_EGRESS_ALLOW` | `api.openai.com` | 키를 넣고 실행할 때 샌드박스가 접속할 수 있는 호스트(쉼표 구분, `.example.com` 은 하위 도메인 포함). Mock 실행은 항상 전부 차단 |
+| `AGENTLAB_EGRESS_ALLOW` | (없음) | 키를 넣고 실행할 때 샌드박스가 추가로 접속할 수 있는 호스트(쉼표 구분, `.example.com` 은 하위 도메인 포함). OpenAI 는 키 프록시로 자동 허용. Mock 실행은 항상 전부 차단 |
 | `AGENTLAB_TRUSTED_PROXY_HOPS` | `1` | 앞단 프록시 수. Cloud Run·리버스 프록시 1개면 1, 서버를 직접 노출하면 0 |
 | `AGENTLAB_MAX_BODY_MB` | `4` | 요청 본문 상한 |
 | `AGENTLAB_MAX_FILES` / `AGENTLAB_MAX_TOTAL_BYTES` | `256` / `2000000` | 실행·검증 요청의 파일 수, 총 크기 상한 |

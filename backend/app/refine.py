@@ -16,7 +16,8 @@ from pathlib import Path
 
 from openai import AsyncOpenAI
 
-from .policy import POLICY_VERSION, check_files as policy_check
+from .policy import POLICY_VERSION
+from .policy import check_files as policy_check
 from .validate import validate
 
 CACHE_DB = Path(os.getenv("AGENTLAB_CACHE_DB", Path(__file__).resolve().parent.parent / "data" / "refine_cache.sqlite"))
@@ -71,13 +72,12 @@ def structure_key(graph: dict) -> str:
         key=lambda n: n["id"],
     )
     edges = sorted(
-        (
-            {"s": e["source"], "t": e["target"], "h": e.get("sourceHandle"), "l": e.get("label")}
-            for e in graph.get("edges", [])
-        ),
+        ({"s": e["source"], "t": e["target"], "h": e.get("sourceHandle"), "l": e.get("label")} for e in graph.get("edges", [])),
         key=lambda e: (e["s"], e["t"], str(e["h"])),
     )
-    payload = json.dumps({"v": GENERATOR_VERSION, "n": nodes, "e": edges, "s": graph.get("settings", {})}, sort_keys=True, ensure_ascii=False)
+    payload = json.dumps(
+        {"v": GENERATOR_VERSION, "n": nodes, "e": edges, "s": graph.get("settings", {})}, sort_keys=True, ensure_ascii=False
+    )
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
@@ -158,10 +158,8 @@ async def refine(graph: dict, files: dict[str, str], api_key: str | None, model:
         },
     ]
     attempts = []
-    for attempt in range(3):
-        resp = await client.chat.completions.create(
-            model=use_model, messages=messages, response_format={"type": "json_object"}
-        )
+    for _ in range(3):
+        resp = await client.chat.completions.create(model=use_model, messages=messages, response_format={"type": "json_object"})
         content = resp.choices[0].message.content or "{}"
         try:
             data = json.loads(content)
@@ -193,5 +191,10 @@ async def refine(graph: dict, files: dict[str, str], api_key: str | None, model:
             },
         ]
     if attempts and attempts[-1].get("report", {}).get("policy"):
-        return {"cached": False, "key": key, "error": "고도화 코드가 보안 정책(네트워크·파일·비밀 환경 변수 접근 금지)을 통과하지 못해 적용하지 않았습니다.", "attempts": attempts}
+        return {
+            "cached": False,
+            "key": key,
+            "error": "고도화 코드가 보안 정책(네트워크·파일·비밀 환경 변수 접근 금지)을 통과하지 못해 적용하지 않았습니다.",
+            "attempts": attempts,
+        }
     return {"cached": False, "key": key, "error": "검증을 통과하지 못했습니다. 기본 템플릿 코드를 유지합니다.", "attempts": attempts}

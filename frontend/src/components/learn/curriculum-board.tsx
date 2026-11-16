@@ -1,18 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { ArrowRight, CheckCircle2, Circle, Clock } from "lucide-react";
 import type { Module } from "@/lib/content";
 import { cn } from "@/lib/utils";
 import { useProgress } from "@/lib/settings";
 import { Icon } from "@/components/ui/icon";
 import { LEVEL_STYLE } from "./lesson-view";
+import { useMounted } from "@/lib/use-mounted";
 
 export function CurriculumBoard({ curriculum }: { curriculum: Module[] }) {
   const done = useProgress((s) => s.done);
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const mounted = useMounted();
   const all = curriculum.flatMap((m) => m.lessons);
   const doneCount = mounted ? all.filter((l) => done[l.id]).length : 0;
   const nextLesson = all.find((l) => !(mounted && done[l.id]));

@@ -2,17 +2,19 @@
 
 import { useAuth } from "./auth";
 import { useSettings } from "./settings";
+import type { TraceEvent } from "./trace";
 
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/$/, "");
 
 export type RunEvent =
   | { type: "start"; mock: boolean; entry: string }
   | { type: "stdout" | "stderr"; data: string }
+  | { type: "trace"; event: TraceEvent }
   | { type: "exit"; code: number; timed_out: boolean; duration_ms: number; mock: boolean }
   | { type: "error"; message: string };
 
-function headers(): HeadersInit {
-  const { apiKey } = useSettings.getState();
+function headers(opts: { noKey?: boolean } = {}): HeadersInit {
+  const apiKey = opts.noKey ? "" : useSettings.getState().apiKey;
   const { token } = useAuth.getState();
   return {
     "content-type": "application/json",
@@ -35,14 +37,14 @@ export async function runCode(
   files: Record<string, string>,
   entry: string,
   onEvent: (e: RunEvent) => void,
-  opts: { timeout?: number; signal?: AbortSignal } = {},
+  opts: { timeout?: number; signal?: AbortSignal; noKey?: boolean } = {},
 ) {
   const { model } = useSettings.getState();
   let res: Response;
   try {
     res = await fetch(`${API_URL}/api/run`, {
       method: "POST",
-      headers: headers(),
+      headers: headers({ noKey: opts.noKey }),
       body: JSON.stringify({ files, entry, timeout: opts.timeout ?? 45, model }),
       signal: opts.signal,
     });

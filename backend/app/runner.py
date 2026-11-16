@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import shutil
 import signal
@@ -19,19 +20,27 @@ import sys
 import sysconfig
 import tempfile
 import time
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import AsyncIterator
+from urllib.parse import urlparse
+
+from .keyproxy import proxied_key
 
 SANDBOX_DIR = Path(__file__).resolve().parent.parent / "sandbox"
 MAX_OUTPUT = int(os.getenv("AGENTLAB_MAX_OUTPUT", 200_000))
 MAX_TIMEOUT = int(os.getenv("AGENTLAB_MAX_TIMEOUT", 90))
 MAX_CONCURRENCY = int(os.getenv("AGENTLAB_MAX_CONCURRENCY", 8))
+MAX_TRACE_EVENTS = int(os.getenv("AGENTLAB_MAX_TRACE_EVENTS", 4000))
+MAX_TRACE_LINE = 1_000_000
+NPROC_LIMIT = int(os.getenv("AGENTLAB_NPROC_LIMIT", 256))
 MAX_FILES = int(os.getenv("AGENTLAB_MAX_FILES", 256))  # 서브 에이전트마다 패키지가 생기므로 넉넉히
 MAX_FILE_BYTES = 200_000
 MAX_TOTAL_BYTES = int(os.getenv("AGENTLAB_MAX_TOTAL_BYTES", 2_000_000))
-# 실제 키로 실행할 때 접속을 허용할 호스트. Mock 모드에서는 외부 연결을 모두 막는다.
-EGRESS_ALLOW = os.getenv("AGENTLAB_EGRESS_ALLOW", "api.openai.com")
+# 샌드박스가 직접 접속할 수 있는 외부 호스트 (기본: 없음). OpenAI 는 키 주입 프록시를 거치므로 여기에 넣지 않는다.
+# Mock 모드에서는 이 값과 상관없이 외부 연결을 모두 막는다.
+EGRESS_ALLOW = os.getenv("AGENTLAB_EGRESS_ALLOW", "")
 GUARD = SANDBOX_DIR / "agentlab_guard.py"
 
 _semaphore = asyncio.Semaphore(MAX_CONCURRENCY)
@@ -103,15 +112,29 @@ def _preexec(timeout: int):
             import resource
 
             resource.setrlimit(resource.RLIMIT_CPU, (timeout + 5, timeout + 5))
-            mem = int(os.getenv("AGENTLAB_MEM_LIMIT_MB", 1024)) * 1024 * 1024
+            # RLIMIT_AS 는 실제 사용량이 아니라 가상 주소 공간을 센다. 스레드 스택(각 8MB 예약)과
+            # chromadb 등의 mmap 때문에 1GB 로는 멀티 에이전트 예제가 스레드를 만들지 못했다.
+            mem = int(os.getenv("AGENTLAB_MEM_LIMIT_MB", 3072)) * 1024 * 1024
             resource.setrlimit(resource.RLIMIT_AS, (mem, mem))
             resource.setrlimit(resource.RLIMIT_FSIZE, (20 * 1024 * 1024, 20 * 1024 * 1024))
-            resource.setrlimit(resource.RLIMIT_NPROC, (256, 256))
+            # RLIMIT_NPROC 은 같은 계정의 모든 프로세스·스레드를 센다. 0 이면 적용하지 않는다(개발 PC·CI 용).
+            if NPROC_LIMIT > 0:
+                resource.setrlimit(resource.RLIMIT_NPROC, (NPROC_LIMIT, NPROC_LIMIT))
 
     return fn
 
 
-def _build_env(workdir: Path, api_key: str | None, model: str | None) -> tuple[dict, bool]:
+@asynccontextmanager
+async def _key_env(api_key: str | None):
+    """진짜 키 대신 키 주입 프록시 주소와 가짜 키를 샌드박스 환경변수로 준다 (keyproxy 참고)."""
+    if not api_key:
+        yield {}
+        return
+    async with proxied_key(api_key) as (base_url, dummy):
+        yield {"OPENAI_API_KEY": dummy, "OPENAI_BASE_URL": base_url, "OPENAI_API_BASE": base_url}
+
+
+def _build_env(workdir: Path, api_key: str | None, model: str | None, key_env: dict) -> tuple[dict, bool]:
     mock = not api_key
     env = {
         "PATH": os.path.dirname(sys.executable) + ":/usr/bin:/bin",
@@ -132,8 +155,12 @@ def _build_env(workdir: Path, api_key: str | None, model: str | None) -> tuple[d
         env["AGENTLAB_MOCK"] = "1"
         env["AGENTLAB_EGRESS_ALLOW"] = ""
     else:
+        env.update(key_env)  # 진짜 키는 넘기지 않는다
         env["AGENTLAB_EGRESS_ALLOW"] = EGRESS_ALLOW
-        env["OPENAI_API_KEY"] = api_key  # type: ignore[assignment]
+        # 샌드박스는 OpenAI 를 키 주입 프록시(127.0.0.1:<port>)로만 호출한다. 그 주소 하나만 연다.
+        proxy = urlparse(key_env.get("OPENAI_BASE_URL", ""))
+        if proxy.hostname and proxy.port:
+            env["AGENTLAB_EGRESS_ADDRS"] = f"{proxy.hostname}:{proxy.port}"
     return env, mock
 
 
@@ -146,31 +173,49 @@ async def stream_run(
     timeout: int = 30,
     stdin: str | None = None,
 ) -> AsyncIterator[dict]:
-    """실행 이벤트를 순서대로 yield 한다: start → stdout/stderr* → exit."""
+    """실행 이벤트를 순서대로 yield 한다: start → (stdout | stderr | trace)* → exit.
+
+    trace 이벤트는 샌드박스의 agentlab_trace 가 별도 파이프(AGENTLAB_TRACE_FD)로 보낸
+    LangChain/LangGraph 실행 이벤트다. stdout/stderr 와 섞이지 않는다.
+    """
     check_files(files, entry)
     timeout = max(1, min(int(timeout), MAX_TIMEOUT))
 
-    async with _semaphore:
+    async with _semaphore, _key_env(api_key) as key_env:
         workdir = Path(tempfile.mkdtemp(prefix="agentlab-")).resolve()
         try:
             for rel, content in files.items():
                 p = _safe_path(workdir, rel)
                 p.parent.mkdir(parents=True, exist_ok=True)
                 p.write_text(content, encoding="utf-8")
-            env, mock = _build_env(workdir, api_key, model)
+            env, mock = _build_env(workdir, api_key, model, key_env)
+            trace_r, trace_w = os.pipe()
+            env["AGENTLAB_TRACE_FD"] = str(trace_w)
             yield {"type": "start", "mock": mock, "entry": entry}
             started = time.perf_counter()
-            proc = await asyncio.create_subprocess_exec(
-                sys.executable,
-                "-X",
-                "utf8",
-                str(_safe_path(workdir, entry)),
-                cwd=str(workdir),
-                env=env,
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                preexec_fn=_preexec(timeout),
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    sys.executable,
+                    "-X",
+                    "utf8",
+                    str(_safe_path(workdir, entry)),
+                    cwd=str(workdir),
+                    env=env,
+                    stdin=asyncio.subprocess.PIPE,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    pass_fds=(trace_w,),
+                    preexec_fn=_preexec(timeout),
+                )
+            except BaseException:
+                os.close(trace_r)
+                raise
+            finally:
+                os.close(trace_w)  # 쓰기 끝은 자식만 갖는다 → 자식이 끝나면 EOF
+            loop = asyncio.get_running_loop()
+            trace_reader = asyncio.StreamReader(limit=MAX_TRACE_LINE, loop=loop)
+            trace_transport, _ = await loop.connect_read_pipe(
+                lambda: asyncio.StreamReaderProtocol(trace_reader, loop=loop), os.fdopen(trace_r, "rb", 0)
             )
             if stdin:
                 proc.stdin.write(stdin.encode())  # type: ignore[union-attr]
@@ -196,21 +241,42 @@ async def stream_run(
                         await queue.put({"type": "stderr", "data": "\n[AgentLab] 출력이 너무 길어 잘렸습니다.\n"})
                 await queue.put(None)
 
+            async def pump_trace():
+                count = 0
+                while True:
+                    try:
+                        line = await trace_reader.readline()
+                    except (asyncio.LimitOverrunError, ValueError):
+                        continue  # 너무 긴 한 줄은 버린다
+                    if not line:
+                        break
+                    if count >= MAX_TRACE_EVENTS:
+                        continue
+                    try:
+                        ev = json.loads(line)
+                    except ValueError:
+                        continue
+                    count += 1
+                    await queue.put({"type": "trace", "event": ev})
+                await queue.put(None)
+
             tasks = [
                 asyncio.create_task(pump(proc.stdout, "stdout")),  # type: ignore[arg-type]
                 asyncio.create_task(pump(proc.stderr, "stderr")),  # type: ignore[arg-type]
+                asyncio.create_task(pump_trace()),
             ]
+            n_streams = len(tasks)
             done_streams = 0
             timed_out = False
             deadline = started + timeout
-            while done_streams < 2:
+            while done_streams < n_streams:
                 remaining = deadline - time.perf_counter()
                 if remaining <= 0:
                     timed_out = True
                     break
                 try:
                     item = await asyncio.wait_for(queue.get(), timeout=remaining)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     timed_out = True
                     break
                 if item is None:
@@ -226,6 +292,7 @@ async def stream_run(
             code = await proc.wait()
             for t in tasks:
                 t.cancel()
+            trace_transport.close()
             yield {
                 "type": "exit",
                 "code": code,

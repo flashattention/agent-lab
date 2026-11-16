@@ -10,8 +10,9 @@ audit hook 은 한 번 설치하면 파이썬 코드로 해제할 수 없다. �
 
 설정 (환경 변수)
 - AGENTLAB_SANDBOX=1           이 값이 있을 때만 활성화된다 (서버 프로세스에는 없다)
-- AGENTLAB_EGRESS_ALLOW=a,b    허용 호스트 (정확히 일치 또는 ".example.com" 접미사)
-                               비어 있으면 모든 외부 연결을 막는다 (Mock 모드)
+- AGENTLAB_EGRESS_ALLOW=a,b    허용 호스트 (정확히 일치 또는 ".example.com" 접미사). 기본은 없음
+- AGENTLAB_EGRESS_ADDRS=ip:port,...  정확히 허용할 주소 (키 주입 프록시 127.0.0.1:<port>)
+                               둘 다 비어 있으면 모든 외부 연결을 막는다 (Mock 모드)
 """
 
 from __future__ import annotations
@@ -43,6 +44,11 @@ def install() -> None:
     import socket
 
     allow = [h.strip().lower() for h in os.environ.get("AGENTLAB_EGRESS_ALLOW", "").split(",") if h.strip()]
+    exact = set()
+    for item in os.environ.get("AGENTLAB_EGRESS_ADDRS", "").split(","):
+        host, _, port = item.strip().rpartition(":")
+        if host and port.isdigit():
+            exact.add((host.strip("[]"), int(port)))
     real_getaddrinfo = socket.getaddrinfo
     state = threading.local()
     cache: dict[str, tuple[float, set[str]]] = {}
@@ -99,7 +105,8 @@ def install() -> None:
         # env={} 처럼 비밀값을 지우는 것은 좋은 습관이므로 허용하되, 자식에게도 이 정책이 걸리도록
         # 활성화 플래그와 허용 목록만 넣어 준다. Popen 은 audit 이후 이 dict 를 그대로 쓴다.
         as_bytes = any(isinstance(k, bytes) for k in env)
-        for k, v in ((_ENV_FLAG, "1"), ("AGENTLAB_EGRESS_ALLOW", ",".join(allow))):
+        addrs = os.environ.get("AGENTLAB_EGRESS_ADDRS", "")
+        for k, v in ((_ENV_FLAG, "1"), ("AGENTLAB_EGRESS_ALLOW", ",".join(allow)), ("AGENTLAB_EGRESS_ADDRS", addrs)):
             env[k.encode() if as_bytes else k] = v.encode() if as_bytes else v
         return True
 
@@ -123,6 +130,8 @@ def install() -> None:
             sock, address = args[0], args[1] if len(args) > 1 else None
             family = getattr(sock, "family", None)
             if family in (socket.AF_INET, socket.AF_INET6) and isinstance(address, tuple):
+                if (str(address[0]), int(address[1])) in exact:
+                    return  # 키 주입 프록시
                 check_ip(str(address[0]))
             elif address is not None:
                 _deny(f"소켓 연결({family})")
@@ -133,7 +142,12 @@ def install() -> None:
                 _deny(f"외부 프로그램 실행 ({first!r})")
             if isinstance(argv, (list, tuple)) and any(os.fsdecode(a) in ("-S",) for a in argv[1:] if isinstance(a, (str, bytes))):
                 _deny("site 비활성화(-S) 파이썬 실행")
-        elif event in ("os.system", "os.exec", "os.posix_spawn", "os.spawn", "os.fork", "os.forkpty", "pty.spawn", "os.startfile"):
+        elif event == "os.posix_spawn":
+            # Python 3.13+ 는 glibc 2.34+ 에서 subprocess 내부적으로 posix_spawn 을 쓴다. Popen 과 같은 기준으로 검사한다.
+            path, _argv, env = args[0], args[1], args[2]
+            if not is_sandbox_python(path, env):
+                _deny(f"외부 프로그램 실행 ({path!r})")
+        elif event in ("os.system", "os.exec", "os.spawn", "os.fork", "os.forkpty", "pty.spawn", "os.startfile"):
             _deny(event)
 
     sys.addaudithook(hook)
