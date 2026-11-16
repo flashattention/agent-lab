@@ -227,3 +227,7 @@ end $$;
 drop trigger if exists agent_preset_reports_hide on public.agent_preset_reports;
 create trigger agent_preset_reports_hide after insert on public.agent_preset_reports
 for each row execute function public.agent_preset_reports_hide();
+
+-- PostgREST(Supabase API)가 새 열·함수를 바로 알도록 스키마 캐시를 다시 읽게 한다.
+-- 이게 없으면 SQL 을 실행한 직후에도 API 가 "column ... not found in the schema cache" 를 낼 수 있다.
+notify pgrst, 'reload schema';

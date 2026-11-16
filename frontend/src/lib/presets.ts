@@ -69,8 +69,14 @@ function writeLocal(items: AgentPreset[]) {
   } catch {}
 }
 
-const missingTable = (msg: string) => /agent_presets|relation .* does not exist|schema cache/i.test(msg);
-const missingColumn = (msg: string) => /column .* does not exist|visibility|get_shared_preset|record_preset_install/i.test(msg);
+// 스키마 누락은 메시지 단어가 아니라 오류 코드로만 판정한다 (권한·로그인·RLS 오류를 '스키마 다시 실행'으로 덮지 않도록)
+type PgError = { code?: string; message: string };
+const MISSING_TABLE = new Set(["42P01", "PGRST205"]); // 테이블 없음 (Postgres / PostgREST 스키마 캐시)
+const MISSING_SCHEMA = new Set([...MISSING_TABLE, "42703", "42883", "PGRST202", "PGRST204"]); // + 열·함수 없음
+export const isMissingTable = (e?: PgError | null) => !!e && MISSING_TABLE.has(e.code ?? "");
+export const isMissingSchema = (e?: PgError | null) => !!e && MISSING_SCHEMA.has(e.code ?? "");
+/** 화면에 보일 오류: 스키마 누락이면 안내와 원래 메시지를 함께, 아니면 원래 메시지 그대로 */
+export const explainError = (e: PgError) => (isMissingSchema(e) ? `${SCHEMA_HINT} (원인: ${e.message})` : e.message);
 const toCloud = (p: unknown, source: PresetSource = "cloud") => ({ ...(p as Omit<AgentPreset, "source">), source }) as AgentPreset;
 const cloudEnabled = () => SUPABASE_ENABLED && !!useAuth.getState().user;
 
@@ -78,6 +84,7 @@ type PresetState = {
   items: AgentPreset[]; // 내 프리셋 (클라우드 + 브라우저)
   loading: boolean;
   error: string;
+  tableMissing: boolean; // 계정 저장소(agent_presets)가 없어 이 브라우저에 저장하는 중
   load: () => Promise<void>;
   save: (draft: PresetDraft, overwriteId?: string) => Promise<AgentPreset>;
   remove: (p: AgentPreset) => Promise<void>;
@@ -90,25 +97,22 @@ export const usePresets = create<PresetState>()((set, get) => ({
   items: [],
   loading: false,
   error: "",
+  tableMissing: false,
   find: (id) => get().items.find((p) => p.id === id) ?? BUILTIN_PRESETS.find((p) => p.id === id),
 
   load: async () => {
     const local = readLocal();
-    if (!cloudEnabled()) return set({ items: local, error: "" });
+    if (!cloudEnabled()) return set({ items: local, error: "", tableMissing: false });
     set({ loading: true });
-    try {
-      // 공개 프리셋도 읽을 수 있으므로 내 것만 거른다
-      const owner = useAuth.getState().user!.id;
-      let res = await supabase().from("agent_presets").select(COLUMNS).eq("owner", owner).order("updated_at", { ascending: false });
-      if (res.error && missingColumn(res.error.message)) res = await supabase().from("agent_presets").select(BASE_COLUMNS).eq("owner", owner).order("updated_at", { ascending: false });
-      if (res.error) throw new Error(res.error.message);
-      set({ items: [...(res.data ?? []).map((p) => toCloud(p)), ...local], error: "" });
-    } catch (e) {
-      const msg = (e as Error).message;
-      set({ items: local, error: missingTable(msg) ? "계정 저장소(agent_presets 테이블)가 아직 없어 이 브라우저에 저장합니다. supabase/schema.sql 을 다시 실행하세요." : msg });
-    } finally {
-      set({ loading: false });
-    }
+    // 공개 프리셋도 읽을 수 있으므로 내 것만 거른다
+    const owner = useAuth.getState().user!.id;
+    let res = await supabase().from("agent_presets").select(COLUMNS).eq("owner", owner).order("updated_at", { ascending: false });
+    if (isMissingSchema(res.error) && !isMissingTable(res.error)) res = await supabase().from("agent_presets").select(BASE_COLUMNS).eq("owner", owner).order("updated_at", { ascending: false });
+    if (!res.error) set({ items: [...(res.data ?? []).map((p) => toCloud(p)), ...local], error: "", tableMissing: false });
+    else if (isMissingTable(res.error))
+      set({ items: local, tableMissing: true, error: `계정 저장소(agent_presets 테이블)가 없어 이 브라우저에 저장합니다. supabase/schema.sql 을 실행하세요. (원인: ${res.error.message})` });
+    else set({ items: local, tableMissing: false, error: `계정 프리셋을 불러오지 못했습니다: ${res.error.message}` });
+    set({ loading: false });
   },
 
   save: async (draft, overwriteId) => {
@@ -123,21 +127,18 @@ export const usePresets = create<PresetState>()((set, get) => ({
       return made;
     };
     let made: AgentPreset;
-    if (cloudEnabled() && target?.source !== "local" && !get().error) {
-      try {
-        const send = (withExtra: boolean, cols: string) => {
-          const b = withExtra ? { ...body, ...extra } : body;
-          const q = target ? supabase().from("agent_presets").update(b).eq("id", target.id) : supabase().from("agent_presets").insert(b);
-          return q.select(cols).single();
-        };
-        let res = await send(true, COLUMNS);
-        if (res.error && missingColumn(res.error.message)) res = await send(false, BASE_COLUMNS);
-        if (res.error) throw new Error(res.error.message);
-        made = toCloud(res.data);
-      } catch (e) {
-        if (!missingTable((e as Error).message)) throw e;
-        made = toLocal();
-      }
+    if (cloudEnabled() && target?.source !== "local" && !get().tableMissing) {
+      const send = (withExtra: boolean, cols: string) => {
+        const b = withExtra ? { ...body, ...extra } : body;
+        const q = target ? supabase().from("agent_presets").update(b).eq("id", target.id) : supabase().from("agent_presets").insert(b);
+        return q.select(cols).single();
+      };
+      let res = await send(true, COLUMNS);
+      // 마켓 열이 아직 없는 DB(이전 스키마)에서는 기본 열만으로 저장한다
+      if (isMissingSchema(res.error) && !isMissingTable(res.error)) res = await send(false, BASE_COLUMNS);
+      if (isMissingTable(res.error)) made = toLocal();
+      else if (res.error) throw new Error(explainError(res.error));
+      else made = toCloud(res.data);
     } else made = toLocal();
     set({ items: [made, ...get().items.filter((p) => p.id !== made.id)] });
     return made;
@@ -158,7 +159,7 @@ export const usePresets = create<PresetState>()((set, get) => ({
       throw new Error("Function 노드나 커스텀 도구가 들어 있는 프리셋은 공개 갤러리에 올릴 수 없습니다. 링크 공유는 가능합니다.");
     const patch = { visibility, ...(category ? { category } : {}) };
     const { data, error } = await supabase().from("agent_presets").update(patch).eq("id", p.id).select(COLUMNS).single();
-    if (error) throw new Error(missingColumn(error.message) ? SCHEMA_HINT : /public_declarative/.test(error.message) ? "선언형 프리셋만 공개할 수 있습니다." : error.message);
+    if (error) throw new Error(/public_declarative/.test(error.message) ? "선언형 프리셋만 공개할 수 있습니다." : explainError(error));
     const made = toCloud(data);
     set({ items: get().items.map((x) => (x.id === made.id ? made : x)) });
     return made;
@@ -192,7 +193,7 @@ export async function listMarket(q: MarketQuery): Promise<AgentPreset[]> {
   if (q.category) req = req.eq("category", q.category);
   req = q.sort === "popular" ? req.order("installs", { ascending: false }).order("published_at", { ascending: false }) : req.order("published_at", { ascending: false });
   const { data, error } = await req.limit(200);
-  if (error) throw new Error(missingColumn(error.message) || missingTable(error.message) ? SCHEMA_HINT : error.message);
+  if (error) throw new Error(explainError(error));
   return (data ?? []).map((p) => toCloud(p, "market"));
 }
 
@@ -200,7 +201,7 @@ export async function listMarket(q: MarketQuery): Promise<AgentPreset[]> {
 export async function getSharedPreset(id: string): Promise<AgentPreset | null> {
   if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
   const { data, error } = await supabase().rpc("get_shared_preset", { p_id: id });
-  if (error) throw new Error(missingColumn(error.message) ? SCHEMA_HINT : error.message);
+  if (error) throw new Error(explainError(error));
   const row = (data as unknown[] | null)?.[0];
   return row ? toCloud(row, "market") : null;
 }

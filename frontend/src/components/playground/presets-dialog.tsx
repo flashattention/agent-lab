@@ -320,7 +320,7 @@ export function SavePresetDialog() {
 function SaveForm({ draft }: { draft: SaveDraft }) {
   const close = () => usePlaygroundUI.getState().openSave(null);
   const setNotice = usePlaygroundUI((x) => x.setNotice);
-  const { items, save, error } = usePresets();
+  const { items, save, tableMissing } = usePresets();
   const user = useAuth((x) => x.user);
   const target = draft.overwriteId ? items.find((p) => p.id === draft.overwriteId) : undefined;
   const [name, setName] = useState(target?.name ?? draft.name);
@@ -330,7 +330,7 @@ function SaveForm({ draft }: { draft: SaveDraft }) {
   const [category, setCategory] = useState(target?.category ?? "기타");
   const [busy, setBusy] = useState(false);
   const sum = summarize(draft.graph);
-  const where = SUPABASE_ENABLED && user && !error && target?.source !== "local" ? "계정에 저장되어 어느 기기에서나 불러올 수 있습니다." : "이 브라우저에 저장됩니다. 로그인하면 계정에 저장됩니다.";
+  const where = SUPABASE_ENABLED && user && !tableMissing && target?.source !== "local" ? "계정에 저장되어 어느 기기에서나 불러올 수 있습니다." : "이 브라우저에 저장됩니다. 로그인하면 계정에 저장됩니다.";
 
   const submit = async () => {
     setBusy(true);
