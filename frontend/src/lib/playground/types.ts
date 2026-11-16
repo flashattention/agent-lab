@@ -48,7 +48,7 @@ export type SubgraphMemory =
   | "inherit" // 부모 체크포인터를 이어받는다. 호출마다 새로 시작 (기본)
   | "persistent"; // checkpointer=True: 같은 thread 에서 호출될 때마다 이전 대화를 기억한다
 
-export type PresetLink = { id: string; name: string; updatedAt?: string };
+export type PresetLink = { id: string; name: string; updatedAt?: string; market?: boolean }; // market: 마켓·링크 공유에서 가져옴
 
 /** 서브그래프. tools 는 프리셋으로 옮길 때 함께 가져가는 커스텀 도구 정의 */
 export type SubGraph = { nodes: GNode[]; edges: GEdge[]; tools?: CustomTool[] };

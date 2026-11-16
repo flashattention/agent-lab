@@ -32,7 +32,7 @@ Google 로그인, 프로젝트 저장, 링크 공유는 Supabase를 씁니다. �
 1. <https://supabase.com>에서 프로젝트를 만듭니다(리전은 Seoul 권장).
    - Data API: **켜기** · Automatically expose new tables: **끄기** · automatic RLS: **켜기** (schema.sql이 필요한 권한을 직접 부여합니다)
 2. **SQL Editor**에 [`supabase/schema.sql`](supabase/schema.sql) 내용을 붙여 넣고 실행합니다. `projects` 테이블과 행 단위 보안 정책이 만들어집니다.
-   이미 실행한 적이 있어도 새 버전으로 한 번 더 실행합니다. 에이전트 프리셋을 저장하는 `agent_presets` 테이블이 추가되었습니다.
+   이미 실행한 적이 있어도 새 버전으로 한 번 더 실행합니다. 에이전트 프리셋과 에이전트 마켓(공개 범위·설치 수·신고)이 추가되었습니다.
 3. **Project Settings → API**에서 두 값을 적어 둡니다.
    - Project URL (`https://xxxx.supabase.co`)
    - anon public key 또는 publishable key(`sb_publishable_...`) (브라우저에 노출되어도 되는 키입니다. `service_role`/secret 키는 어디에도 넣지 않습니다.)

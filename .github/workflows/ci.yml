@@ -67,3 +67,23 @@ jobs:
       - run: uv python install 3.13
       - run: uv sync --frozen
       - run: uv run python scripts/check_content.py
+
+  database:
+    name: Database (schema · RLS · grants)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: pw
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: pw
+    steps:
+      - uses: actions/checkout@v4
+      # 스키마를 두 번 적용해 여러 번 실행해도 안전한지(멱등성)까지 확인한다
+      - run: psql -q -v ON_ERROR_STOP=1 -f supabase/tests/stub.sql -f supabase/schema.sql -f supabase/schema.sql -f supabase/tests/rls_test.sql

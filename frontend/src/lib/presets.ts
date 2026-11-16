@@ -5,11 +5,15 @@
 import { create } from "zustand";
 import type { SubGraph } from "@/lib/playground/types";
 import { PATTERNS } from "@/lib/playground/patterns";
-import { pyIdent } from "@/lib/playground/subgraph";
+import { TOOL_LIBRARY } from "@/lib/playground/catalog";
+import { allNodes, pyIdent } from "@/lib/playground/subgraph";
 import { useAuth } from "./auth";
 import { supabase, SUPABASE_ENABLED } from "./supabase";
 
-export type PresetSource = "cloud" | "local" | "builtin";
+export type PresetSource = "cloud" | "local" | "builtin" | "market";
+export type Visibility = "private" | "link" | "public";
+
+export const MARKET_CATEGORIES = ["리서치", "고객지원", "글쓰기", "데이터 분석", "RAG", "코딩", "업무 자동화", "기타"] as const;
 
 export type AgentPreset = {
   id: string;
@@ -20,12 +24,24 @@ export type AgentPreset = {
   updated_at: string;
   source: PresetSource;
   category?: string;
+  // 계정·마켓 프리셋에만 있는 값
+  owner?: string;
+  visibility?: Visibility;
+  author_name?: string;
+  tags?: string[];
+  installs?: number;
+  declarative?: boolean;
+  forked_from?: string | null;
+  published_at?: string | null;
 };
 
-export type PresetDraft = { name: string; node_name: string; description: string; graph: SubGraph };
+export type PresetDraft = { name: string; node_name: string; description: string; graph: SubGraph; category?: string; forked_from?: string | null };
 
 const LOCAL_KEY = "agentlab-presets";
-const COLUMNS = "id, name, node_name, description, graph, updated_at";
+// string 으로 두어 supabase-js 가 열 목록마다 다른 행 타입을 추론하지 않게 한다
+const BASE_COLUMNS: string = "id, name, node_name, description, graph, updated_at";
+const COLUMNS: string = `${BASE_COLUMNS}, owner, visibility, author_name, category, tags, installs, declarative, forked_from, published_at`;
+const SCHEMA_HINT = "에이전트 마켓을 쓰려면 supabase/schema.sql 을 다시 실행해 주세요.";
 
 /** 패턴 갤러리의 설계를 그대로 Sub-agent 로 쓸 수 있게 기본 제공한다. */
 export const BUILTIN_PRESETS: AgentPreset[] = PATTERNS.map((p) => ({
@@ -54,6 +70,8 @@ function writeLocal(items: AgentPreset[]) {
 }
 
 const missingTable = (msg: string) => /agent_presets|relation .* does not exist|schema cache/i.test(msg);
+const missingColumn = (msg: string) => /column .* does not exist|visibility|get_shared_preset|record_preset_install/i.test(msg);
+const toCloud = (p: unknown, source: PresetSource = "cloud") => ({ ...(p as Omit<AgentPreset, "source">), source }) as AgentPreset;
 const cloudEnabled = () => SUPABASE_ENABLED && !!useAuth.getState().user;
 
 type PresetState = {
@@ -64,6 +82,8 @@ type PresetState = {
   save: (draft: PresetDraft, overwriteId?: string) => Promise<AgentPreset>;
   remove: (p: AgentPreset) => Promise<void>;
   find: (id: string) => AgentPreset | undefined;
+  setVisibility: (p: AgentPreset, visibility: Visibility, category?: string) => Promise<AgentPreset>;
+  fork: (p: AgentPreset) => Promise<AgentPreset>;
 };
 
 export const usePresets = create<PresetState>()((set, get) => ({
@@ -77,9 +97,12 @@ export const usePresets = create<PresetState>()((set, get) => ({
     if (!cloudEnabled()) return set({ items: local, error: "" });
     set({ loading: true });
     try {
-      const { data, error } = await supabase().from("agent_presets").select(COLUMNS).order("updated_at", { ascending: false });
-      if (error) throw new Error(error.message);
-      set({ items: [...(data ?? []).map((p) => ({ ...(p as Omit<AgentPreset, "source">), source: "cloud" as const })), ...local], error: "" });
+      // 공개 프리셋도 읽을 수 있으므로 내 것만 거른다
+      const owner = useAuth.getState().user!.id;
+      let res = await supabase().from("agent_presets").select(COLUMNS).eq("owner", owner).order("updated_at", { ascending: false });
+      if (res.error && missingColumn(res.error.message)) res = await supabase().from("agent_presets").select(BASE_COLUMNS).eq("owner", owner).order("updated_at", { ascending: false });
+      if (res.error) throw new Error(res.error.message);
+      set({ items: [...(res.data ?? []).map((p) => toCloud(p)), ...local], error: "" });
     } catch (e) {
       const msg = (e as Error).message;
       set({ items: local, error: missingTable(msg) ? "계정 저장소(agent_presets 테이블)가 아직 없어 이 브라우저에 저장합니다. supabase/schema.sql 을 다시 실행하세요." : msg });
@@ -90,6 +113,7 @@ export const usePresets = create<PresetState>()((set, get) => ({
 
   save: async (draft, overwriteId) => {
     const body = { name: draft.name.trim().slice(0, 80) || "이름 없는 에이전트", node_name: pyIdent(draft.node_name), description: draft.description.trim().slice(0, 500), graph: draft.graph };
+    const extra = { ...(draft.category ? { category: draft.category } : {}), ...(draft.forked_from ? { forked_from: draft.forked_from } : {}) };
     const target = overwriteId ? get().items.find((p) => p.id === overwriteId) : undefined;
     const toLocal = () => {
       const now = new Date().toISOString();
@@ -101,10 +125,15 @@ export const usePresets = create<PresetState>()((set, get) => ({
     let made: AgentPreset;
     if (cloudEnabled() && target?.source !== "local" && !get().error) {
       try {
-        const q = target ? supabase().from("agent_presets").update(body).eq("id", target.id) : supabase().from("agent_presets").insert(body);
-        const { data, error } = await q.select(COLUMNS).single();
-        if (error) throw new Error(error.message);
-        made = { ...(data as Omit<AgentPreset, "source">), source: "cloud" };
+        const send = (withExtra: boolean, cols: string) => {
+          const b = withExtra ? { ...body, ...extra } : body;
+          const q = target ? supabase().from("agent_presets").update(b).eq("id", target.id) : supabase().from("agent_presets").insert(b);
+          return q.select(cols).single();
+        };
+        let res = await send(true, COLUMNS);
+        if (res.error && missingColumn(res.error.message)) res = await send(false, BASE_COLUMNS);
+        if (res.error) throw new Error(res.error.message);
+        made = toCloud(res.data);
       } catch (e) {
         if (!missingTable((e as Error).message)) throw e;
         made = toLocal();
@@ -122,4 +151,89 @@ export const usePresets = create<PresetState>()((set, get) => ({
     } else writeLocal(readLocal().filter((x) => x.id !== p.id));
     set({ items: get().items.filter((x) => x.id !== p.id) });
   },
+
+  setVisibility: async (p, visibility, category) => {
+    if (p.source !== "cloud") throw new Error("공유하려면 로그인한 뒤 계정에 저장된 프리셋이어야 합니다.");
+    if (visibility === "public" && !isDeclarative(p.graph))
+      throw new Error("Function 노드나 커스텀 도구가 들어 있는 프리셋은 공개 갤러리에 올릴 수 없습니다. 링크 공유는 가능합니다.");
+    const patch = { visibility, ...(category ? { category } : {}) };
+    const { data, error } = await supabase().from("agent_presets").update(patch).eq("id", p.id).select(COLUMNS).single();
+    if (error) throw new Error(missingColumn(error.message) ? SCHEMA_HINT : /public_declarative/.test(error.message) ? "선언형 프리셋만 공개할 수 있습니다." : error.message);
+    const made = toCloud(data);
+    set({ items: get().items.map((x) => (x.id === made.id ? made : x)) });
+    return made;
+  },
+
+  /** 남의 (공유·공개) 프리셋을 내 프리셋으로 복제한다 */
+  fork: async (p) => {
+    const made = await get().save({ name: p.name, node_name: p.node_name, description: p.description, graph: p.graph, category: p.category, forked_from: p.source === "market" ? p.id : null });
+    if (p.source === "market") recordInstall(p.id);
+    return made;
+  },
 }));
+
+/* ------------------------------------------------------------------ 마켓 */
+
+const BUILTIN_TOOLS = new Set(Object.keys(TOOL_LIBRARY));
+
+/** 실행되는 사용자 코드가 없는 그래프인지 (DB 의 agentlab_is_declarative 와 같은 규칙) */
+export function isDeclarative(g: SubGraph): boolean {
+  if (g.tools?.length) return false;
+  return allNodes(g).every((n) => n.kind !== "function" && (n.data.tools ?? []).every((t) => BUILTIN_TOOLS.has(t)));
+}
+
+export const shareLink = (id: string) => `${window.location.origin}/agents?id=${id}`;
+
+export type MarketQuery = { sort: "popular" | "recent"; category?: string };
+
+/** 공개 갤러리 목록. 검색은 화면에서 거른다 (수가 많아지면 서버 검색으로 옮긴다). */
+export async function listMarket(q: MarketQuery): Promise<AgentPreset[]> {
+  let req = supabase().from("agent_presets").select(COLUMNS).eq("visibility", "public").eq("hidden", false);
+  if (q.category) req = req.eq("category", q.category);
+  req = q.sort === "popular" ? req.order("installs", { ascending: false }).order("published_at", { ascending: false }) : req.order("published_at", { ascending: false });
+  const { data, error } = await req.limit(200);
+  if (error) throw new Error(missingColumn(error.message) || missingTable(error.message) ? SCHEMA_HINT : error.message);
+  return (data ?? []).map((p) => toCloud(p, "market"));
+}
+
+/** 링크로 공유된(또는 공개된) 프리셋 하나. 로그인 없이도 읽는다. */
+export async function getSharedPreset(id: string): Promise<AgentPreset | null> {
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
+  const { data, error } = await supabase().rpc("get_shared_preset", { p_id: id });
+  if (error) throw new Error(missingColumn(error.message) ? SCHEMA_HINT : error.message);
+  const row = (data as unknown[] | null)?.[0];
+  return row ? toCloud(row, "market") : null;
+}
+
+/** 설치 수 기록 (로그인 사용자당 한 번, 실패해도 무시) */
+export function recordInstall(id: string) {
+  if (!cloudEnabled() || !/^[0-9a-f-]{36}$/i.test(id)) return;
+  supabase()
+    .rpc("record_preset_install", { p_id: id })
+    .then(
+      () => {},
+      () => {},
+    );
+}
+
+export async function reportPreset(id: string, reason: string) {
+  const { error } = await supabase().from("agent_preset_reports").insert({ preset_id: id, reason: reason.trim().slice(0, 500) });
+  if (error && !/duplicate key/i.test(error.message)) throw new Error(error.message);
+}
+
+/** 마켓에서 고른 프리셋을 플레이그라운드로 넘길 때 쓰는 임시 보관함 */
+const PENDING_KEY = "agentlab-pending-preset";
+export function setPendingPreset(p: AgentPreset) {
+  try {
+    sessionStorage.setItem(PENDING_KEY, JSON.stringify(p));
+  } catch {}
+}
+export function takePendingPreset(): AgentPreset | null {
+  try {
+    const raw = sessionStorage.getItem(PENDING_KEY);
+    sessionStorage.removeItem(PENDING_KEY);
+    return raw ? (JSON.parse(raw) as AgentPreset) : null;
+  } catch {
+    return null;
+  }
+}

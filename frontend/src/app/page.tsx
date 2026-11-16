@@ -17,7 +17,7 @@ const SUBAGENT_POINTS = [
   { title: "열어서 고칩니다", desc: "Sub-agent 노드를 더블클릭하면 안쪽 그래프가 열립니다. 몇 단계든 중첩되고, 위쪽 경로를 눌러 바깥으로 돌아옵니다." },
   { title: "묶고 풉니다", desc: "노드 몇 개를 골라 Sub-agent 하나로 묶거나, 반대로 풀어서 바깥 그래프에 펼칩니다." },
   { title: "주고받는 방식을 고릅니다", desc: "최종 답변만 돌려받는 격리 모드와 상태를 그대로 나누는 공유 모드, 호출마다 새로 시작할지 이전 대화를 기억할지 정합니다." },
-  { title: "프리셋으로 다시 씁니다", desc: "만든 에이전트를 계정에 저장해 두고 다른 그래프에 끌어다 놓습니다. 원본이 바뀌면 알려 주고, JSON으로 팀원과 주고받습니다." },
+  { title: "마켓에서 주고받습니다", desc: "만든 에이전트를 프리셋으로 저장해 링크로 공유하거나 공개 갤러리에 올립니다. 다른 사람이 만든 에이전트를 골라 내 그래프에 붙이고, 원본이 바뀌면 알려 줍니다." },
 ];
 
 const DAILY = [
@@ -84,7 +84,7 @@ export default async function Home() {
       <section className="border-y border-border bg-surface">
         <div className="mx-auto grid max-w-6xl items-center gap-12 px-6 py-20 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
           <div className="min-w-0">
-            <span className="rounded-full bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent">Sub-agent · 프리셋</span>
+            <span className="rounded-full bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent">Sub-agent · 프리셋 · 마켓</span>
             <h2 className="mt-4 text-2xl font-bold tracking-tight text-balance md:text-3xl">큰 에이전트는 나눠서 만들고, 만든 것은 다시 씁니다</h2>
             <p className="mt-3 text-sm leading-relaxed text-muted">
               팀 단위 멀티 에이전트도 한 화면에서 다룹니다. 생성 코드에서는 서브 에이전트마다 패키지가 따로 생겨, 단독으로 테스트하고 LangGraph Server에서도 별도 그래프로 열립니다.
@@ -97,6 +97,9 @@ export default async function Home() {
                 </div>
               ))}
             </dl>
+            <Link href="/agents" className="mt-8 inline-flex items-center rounded-xl border border-border bg-bg px-4 py-2.5 text-sm font-semibold hover:border-border-strong">
+              에이전트 마켓 둘러보기
+            </Link>
           </div>
           <div className="min-w-0">
             <SubagentFigure />

@@ -1,9 +1,11 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { Boxes, Cloud, Download, FileUp, HardDrive, Loader2, Package, Plus, Search, Trash2, X } from "lucide-react";
+import { Boxes, Cloud, Copy, Download, FileUp, Globe, HardDrive, Link2, Loader2, Lock, Package, Plus, Search, Trash2, X } from "lucide-react";
 import { checkSub, PRESET_FORMAT } from "@/lib/playground/graph-file";
-import { BUILTIN_PRESETS, usePresets, type AgentPreset } from "@/lib/presets";
+import { BUILTIN_PRESETS, isDeclarative, MARKET_CATEGORIES, shareLink, usePresets, type AgentPreset, type Visibility } from "@/lib/presets";
+import { MarketGrid } from "@/components/market/market-view";
+import { PresetDetail } from "@/components/market/preset-detail";
 import { allNodes, summarize, pyIdent } from "@/lib/playground/subgraph";
 import type { SubGraph } from "@/lib/playground/types";
 import { useAuth } from "@/lib/auth";
@@ -28,6 +30,7 @@ export function SourceBadge({ source }: { source: AgentPreset["source"] }) {
     cloud: { icon: Cloud, text: "계정", cls: "bg-accent-soft text-accent" },
     local: { icon: HardDrive, text: "이 브라우저", cls: "bg-surface-2 text-fg-2" },
     builtin: { icon: Package, text: "기본 제공", cls: "bg-success/10 text-success" },
+    market: { icon: Globe, text: "마켓", cls: "bg-warning/10 text-warning" },
   }[source];
   const I = map.icon;
   return (
@@ -54,7 +57,9 @@ function Library({ onInsert }: { onInsert: (p: AgentPreset) => void }) {
   const setNotice = usePlaygroundUI((x) => x.setNotice);
   const { items, loading, error, remove, save } = usePresets();
   // 저장한 프리셋이 없으면 기본 제공 탭부터 보여 준다
-  const [tab, setTab] = useState<"mine" | "builtin">(() => (usePresets.getState().items.length ? "mine" : "builtin"));
+  const [tab, setTab] = useState<"mine" | "builtin" | "market">(() => (usePresets.getState().items.length ? "mine" : "builtin"));
+  const [detail, setDetail] = useState<AgentPreset | null>(null);
+  const user = useAuth((x) => x.user);
   const fileRef = useRef<HTMLInputElement>(null);
   const exportPreset = (p: AgentPreset) => {
     const body = { format: PRESET_FORMAT, version: 1, preset: { name: p.name, node_name: p.node_name, description: p.description, graph: p.graph } };
@@ -85,7 +90,7 @@ function Library({ onInsert }: { onInsert: (p: AgentPreset) => void }) {
   };
   const [q, setQ] = useState("");
   const list = useMemo(() => {
-    const base = tab === "mine" ? items : BUILTIN_PRESETS;
+    const base = tab === "mine" ? items : tab === "builtin" ? BUILTIN_PRESETS : [];
     const k = q.trim().toLowerCase();
     return k ? base.filter((p) => [p.name, p.node_name, p.description].some((x) => x.toLowerCase().includes(k))) : base;
   }, [tab, items, q]);
@@ -109,6 +114,7 @@ function Library({ onInsert }: { onInsert: (p: AgentPreset) => void }) {
             [
               ["mine", `내 에이전트 ${items.length}`],
               ["builtin", `기본 제공 ${BUILTIN_PRESETS.length}`],
+              ...(SUPABASE_ENABLED ? ([["market", "마켓"]] as const) : []),
             ] as const
           ).map(([id, label]) => (
             <button key={id} onClick={() => setTab(id)} className={cn("rounded-full px-3 py-1 text-xs", tab === id ? "bg-accent text-accent-fg" : "text-muted hover:bg-surface-2")}>
@@ -129,12 +135,19 @@ function Library({ onInsert }: { onInsert: (p: AgentPreset) => void }) {
               e.target.value = "";
             }}
           />
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="이름·설명 검색" className={cn(field, "pl-8")} />
-          </div>
+          {tab !== "market" && (
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="이름·설명 검색" className={cn(field, "pl-8")} />
+            </div>
+          )}
         </div>
         {error && <div className="border-b border-warning/30 bg-warning/10 px-6 py-1.5 text-xs text-warning">{error}</div>}
+        {tab === "market" ? (
+          <div className="min-h-0 flex-1 overflow-y-auto p-6">
+            <MarketGrid dense onOpen={setDetail} />
+          </div>
+        ) : (
         <div className="grid min-h-0 flex-1 auto-rows-max gap-4 overflow-y-auto p-6 sm:grid-cols-2 lg:grid-cols-3">
           {loading && (
             <div className="col-span-full flex items-center gap-2 text-sm text-muted">
@@ -174,6 +187,8 @@ function Library({ onInsert }: { onInsert: (p: AgentPreset) => void }) {
                     노드 {sum.count}개{sum.nested ? ` · 서브 ${sum.nested}` : ""}
                     {sum.tools.length ? ` · ${sum.tools.slice(0, 3).join(", ")}${sum.tools.length > 3 ? "…" : ""}` : ""}
                   </p>
+                  {p.source === "cloud" && <ShareControl p={p} />}
+                  {p.source === "local" && SUPABASE_ENABLED && <p className="mt-2 text-[11px] text-muted">로그인해서 계정에 저장하면 링크 공유와 공개가 가능합니다.</p>}
                   <div className="mt-auto flex items-center gap-1.5 pt-3">
                     <button onClick={() => onInsert(p)} className="mr-auto flex items-center gap-1 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-accent-fg hover:brightness-110">
                       <Plus className="h-3.5 w-3.5" /> Sub-agent 로 추가
@@ -203,7 +218,93 @@ function Library({ onInsert }: { onInsert: (p: AgentPreset) => void }) {
             );
           })}
         </div>
+        )}
       </div>
+      {detail && (
+        <PresetDetail
+          preset={detail}
+          useLabel="Sub-agent 로 추가"
+          onClose={() => setDetail(null)}
+          onUse={(p) => {
+            setDetail(null);
+            onInsert(p);
+          }}
+          onFork={
+            user
+              ? async (p) => {
+                  await usePresets.getState().fork(p);
+                }
+              : undefined
+          }
+        />
+      )}
+    </div>
+  );
+}
+
+/** 계정 프리셋의 공개 범위: 비공개 / 링크 공유 / 공개 갤러리 */
+function ShareControl({ p }: { p: AgentPreset }) {
+  const setVisibility = usePresets((x) => x.setVisibility);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const v = p.visibility ?? "private";
+  const declarative = isDeclarative(p.graph);
+  const change = async (next: Visibility, category?: string) => {
+    if (next === "public" && !confirm("공개 갤러리에 올리면 누구나 이 에이전트의 프롬프트와 구조를 볼 수 있습니다. 올릴까요?")) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      await setVisibility(p, next, category);
+      if (next !== "private" && !category) {
+        await navigator.clipboard.writeText(shareLink(p.id)).catch(() => {});
+        setMsg({ ok: true, text: next === "public" ? "공개했습니다. 링크도 복사했습니다." : "링크를 복사했습니다." });
+      }
+    } catch (e) {
+      setMsg({ ok: false, text: (e as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  };
+  const opts: [Visibility, string, typeof Lock][] = [
+    ["private", "비공개", Lock],
+    ["link", "링크 공유", Link2],
+    ["public", "공개", Globe],
+  ];
+  return (
+    <div className="mt-3 space-y-1.5 rounded-xl border border-border p-2">
+      <div className="flex items-center gap-1">
+        {opts.map(([id, label, I]) => (
+          <button
+            key={id}
+            disabled={busy || (id === "public" && !declarative)}
+            onClick={() => id !== v && change(id)}
+            title={id === "public" && !declarative ? "Function 노드나 커스텀 도구가 있으면 공개 갤러리에 올릴 수 없습니다" : undefined}
+            className={cn(
+              "flex flex-1 items-center justify-center gap-1 rounded-lg px-1.5 py-1 text-[11px] disabled:opacity-40",
+              v === id ? "bg-accent-soft font-semibold text-accent" : "text-muted hover:bg-surface-2",
+            )}
+          >
+            {busy && v !== id ? null : <I className="h-3 w-3" />} {label}
+          </button>
+        ))}
+        {v !== "private" && (
+          <button onClick={() => navigator.clipboard.writeText(shareLink(p.id)).then(() => setMsg({ ok: true, text: "링크를 복사했습니다." }))} className="rounded-lg p-1 text-muted hover:bg-surface-2 hover:text-fg" title="링크 복사">
+            <Copy className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+      {v === "public" && (
+        <div className="flex items-center gap-1.5 text-[11px] text-muted">
+          카테고리
+          <select value={p.category ?? "기타"} disabled={busy} onChange={(e) => change("public", e.target.value)} className="rounded-md border border-border bg-bg px-1.5 py-0.5 text-[11px]">
+            {MARKET_CATEGORIES.map((c) => (
+              <option key={c}>{c}</option>
+            ))}
+          </select>
+          <span className="ml-auto">설치 {p.installs ?? 0}</span>
+        </div>
+      )}
+      {msg && <p className={cn("text-[11px]", msg.ok ? "text-success" : "text-danger")}>{msg.text}</p>}
     </div>
   );
 }
@@ -226,6 +327,7 @@ function SaveForm({ draft }: { draft: SaveDraft }) {
   const [nodeName, setNodeName] = useState(draft.node_name);
   const [desc, setDesc] = useState(draft.description);
   const [mode, setMode] = useState<"new" | "overwrite">(target ? "overwrite" : "new");
+  const [category, setCategory] = useState(target?.category ?? "기타");
   const [busy, setBusy] = useState(false);
   const sum = summarize(draft.graph);
   const where = SUPABASE_ENABLED && user && !error && target?.source !== "local" ? "계정에 저장되어 어느 기기에서나 불러올 수 있습니다." : "이 브라우저에 저장됩니다. 로그인하면 계정에 저장됩니다.";
@@ -233,7 +335,7 @@ function SaveForm({ draft }: { draft: SaveDraft }) {
   const submit = async () => {
     setBusy(true);
     try {
-      const made = await save({ name, node_name: nodeName, description: desc, graph: withUsedTools(draft.graph) }, mode === "overwrite" ? target?.id : undefined);
+      const made = await save({ name, node_name: nodeName, description: desc, graph: withUsedTools(draft.graph), category }, mode === "overwrite" ? target?.id : undefined);
       if (draft.linkNodeId) usePlayground.getState().updateNode(draft.linkNodeId, { preset: { id: made.id, name: made.name, updatedAt: made.updated_at } });
       setNotice({ kind: "ok", text: `'${made.name}' 프리셋을 ${mode === "overwrite" ? "덮어썼습니다" : "저장했습니다"}. 다른 그래프에서 프리셋 목록으로 불러올 수 있습니다.` });
       close();
@@ -290,6 +392,16 @@ function SaveForm({ draft }: { draft: SaveDraft }) {
             <label className={labelCls}>역할 설명 (Supervisor 가 참고)</label>
             <textarea className={cn(field, "min-h-20 resize-y")} value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="이 에이전트가 맡는 일과 잘하는 것" />
           </div>
+          {SUPABASE_ENABLED && user && (
+            <div>
+              <label className={labelCls}>카테고리 (마켓에 공개할 때 사용)</label>
+              <select className={field} value={category} onChange={(e) => setCategory(e.target.value)}>
+                {MARKET_CATEGORIES.map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
         <p className="mt-3 text-[11px] text-muted">{where}</p>
         <div className="mt-4 flex justify-end gap-2">

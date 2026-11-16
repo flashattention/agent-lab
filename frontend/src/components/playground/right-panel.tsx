@@ -1,12 +1,12 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Activity, Boxes, ChevronDown, Info, Library, Link2, Loader2, Maximize2, Plus, RefreshCw, Save, Settings2, Shapes, SlidersHorizontal, Trash2, Unlink, Ungroup, Wrench } from "lucide-react";
 import { CUSTOM_TOOL_TEMPLATE, KINDS, MODEL_KINDS, MODEL_SUGGESTIONS, PALETTE_ORDER, toolCatalog } from "@/lib/playground/catalog";
 import type { CustomTool, NodeKind, RouterStrategy, SubgraphIO, SubgraphMemory } from "@/lib/playground/types";
 import { summarize, wrapNode } from "@/lib/playground/subgraph";
-import { usePresets, type AgentPreset } from "@/lib/presets";
+import { getSharedPreset, usePresets, type AgentPreset } from "@/lib/presets";
 import { cn } from "@/lib/utils";
 import { Icon } from "@/components/ui/icon";
 import { presetOutdated, SourceBadge } from "./presets-dialog";
@@ -271,10 +271,23 @@ function SubgraphInspector({ id }: { id: string }) {
   const find = usePresets((x) => x.find);
   usePresets((x) => x.items); // 목록이 바뀌면 다시 그린다
   const setNotice = usePlaygroundUI((x) => x.setNotice);
+  // 마켓에서 가져온 노드는 원본을 서버에서 확인한다 (업데이트 알림·다시 불러오기)
+  const [remote, setRemote] = useState<{ id: string; p: AgentPreset | null } | null>(null);
+  const marketId = node?.data.preset?.market ? node.data.preset.id : null;
+  useEffect(() => {
+    if (!marketId) return;
+    let alive = true;
+    getSharedPreset(marketId)
+      .then((p) => alive && setRemote({ id: marketId, p }))
+      .catch(() => alive && setRemote({ id: marketId, p: null }));
+    return () => {
+      alive = false;
+    };
+  }, [marketId]);
   if (!node) return null;
   const d = node.data;
   const sum = summarize(d.graph);
-  const preset = d.preset ? find(d.preset.id) : undefined;
+  const preset = d.preset ? (find(d.preset.id) ?? (remote?.id === d.preset.id ? (remote.p ?? undefined) : undefined)) : undefined;
   const outdated = presetOutdated(d.preset, preset);
   const btn = "flex items-center justify-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium hover:bg-surface-2";
 
@@ -349,7 +362,7 @@ function SubgraphInspector({ id }: { id: string }) {
                 node_name: d.name,
                 description: d.description ?? "",
                 linkNodeId: id,
-                overwriteId: preset && preset.source !== "builtin" ? preset.id : undefined,
+                overwriteId: preset && (preset.source === "cloud" || preset.source === "local") ? preset.id : undefined, // 남의 마켓 프리셋은 덮어쓰지 않는다
               })
             }
           >
@@ -360,7 +373,7 @@ function SubgraphInspector({ id }: { id: string }) {
               className={cn(btn, outdated && "border-warning/50 text-warning")}
               onClick={() => {
                 if (!confirm(`'${preset.name}' 프리셋의 최신 내용으로 내부 그래프를 바꿀까요? 이 노드 안에서 고친 내용은 사라집니다 (실행 취소 가능).`)) return;
-                replaceSubgraph(id, preset.graph, { preset: { id: preset.id, name: preset.name, updatedAt: preset.updated_at || undefined } });
+                replaceSubgraph(id, preset.graph, { preset: { id: preset.id, name: preset.name, updatedAt: preset.updated_at || undefined, ...(preset.source === "market" ? { market: true } : {}) } });
                 setNotice({ kind: "ok", text: `'${preset.name}' 프리셋 내용으로 갱신했습니다.` });
               }}
             >

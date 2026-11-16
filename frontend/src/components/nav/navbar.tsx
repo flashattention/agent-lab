@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
-import { BookOpen, Boxes, FileText, FolderOpen, KeyRound, Moon, Settings2, Sun, Workflow } from "lucide-react";
+import { BookOpen, Boxes, FileText, FolderOpen, Globe, KeyRound, Moon, Settings2, Sun, Workflow } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/lib/settings";
 import { health } from "@/lib/api";
@@ -15,7 +15,7 @@ import { useMounted } from "@/lib/use-mounted";
 
 const LINKS = [
   { href: "/playground", label: "플레이그라운드", icon: Workflow },
-  ...(SUPABASE_ENABLED ? [{ href: "/projects", label: "내 프로젝트", icon: FolderOpen }] : []),
+  ...(SUPABASE_ENABLED ? [{ href: "/projects", label: "내 프로젝트", icon: FolderOpen }, { href: "/agents", label: "마켓", icon: Globe }] : []),
   { href: "/learn", label: "학습", icon: BookOpen },
   { href: "/docs", label: "Docs", icon: FileText },
 ];

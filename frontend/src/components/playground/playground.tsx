@@ -7,7 +7,7 @@ import { analyze, highlightAt } from "@/lib/playground/analyze";
 import { generateProject, normalizeGraph } from "@/lib/playground/codegen";
 import { PATTERNS } from "@/lib/playground/patterns";
 import type { Issue, NodeKind } from "@/lib/playground/types";
-import { usePresets, type AgentPreset } from "@/lib/presets";
+import { recordInstall, takePendingPreset, usePresets, type AgentPreset } from "@/lib/presets";
 import { exportGraphJson, parseGraphJson } from "@/lib/playground/graph-file";
 import { lookupRefined, refineCode, validateCode, type ValidateReport } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
@@ -189,15 +189,29 @@ function Workspace() {
     (p: AgentPreset, pos?: { x: number; y: number }) => {
       s.addSubgraph(
         p.graph,
-        { name: p.node_name, description: p.description, preset: { id: p.id, name: p.name, updatedAt: p.updated_at || undefined }, io: "isolated", memory: "inherit" },
+        { name: p.node_name, description: p.description, preset: { id: p.id, name: p.name, updatedAt: p.updated_at || undefined, ...(p.source === "market" ? { market: true } : {}) }, io: "isolated", memory: "inherit" },
         freeSpot(pos),
       );
       s.setActiveTab(CANVAS_TAB);
       usePlaygroundUI.getState().setLibraryOpen(false);
+      if (p.source === "market") recordInstall(p.id);
       setNotice({ kind: "ok", text: `'${p.name}' 을(를) Sub-agent 로 추가했습니다. 다른 노드와 연결하고, 더블클릭하면 내부를 고칠 수 있습니다.` });
     },
     [s, freeSpot, setNotice],
   );
+
+  // 마켓 페이지에서 '플레이그라운드에서 쓰기'로 넘어온 에이전트를 지금 그래프에 넣는다
+  // 프로젝트를 서버에서 불러오는 중이면 끝난 뒤에 넣는다 (늦게 도착한 프로젝트가 덮어쓰지 않게)
+  const syncSettled = sync.state !== "loading";
+  useEffect(() => {
+    if (!mounted || !syncSettled) return;
+    // 타이머가 실제로 돌 때 꺼낸다: 그사이 불러오기가 시작되면 취소되고, 끝난 뒤 다시 예약된다
+    const t = setTimeout(() => {
+      const p = takePendingPreset();
+      if (p) addPreset(p);
+    }, 150);
+    return () => clearTimeout(t);
+  }, [mounted, syncSettled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const group = () => {
     const name = prompt("서브 에이전트 이름 (Python 식별자)", "sub_agent");

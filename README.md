@@ -16,6 +16,7 @@
 |---|---|
 | **그래프 → 코드** | 노드를 끌어다 잇는 동안 LangGraph 프로젝트(파일 트리)가 실시간으로 생성됩니다. 패턴 13종(ReAct, 라우터, 병렬, Map-Reduce, Reflection, Plan-Execute, Supervisor, 계층형 팀, Agentic RAG, Human-in-the-loop 등)을 제공하고, LLM 호출 없는 구조 테스트(pytest)가 든 ZIP으로 내려받습니다. |
 | **Sub-agent · 프리셋** | Sub-agent 노드를 더블클릭해 안쪽 그래프를 편집합니다(중첩 가능, 묶기/펼치기, 격리·상태 공유 모드). 서브 에이전트마다 독립 패키지가 생성됩니다. 만든 에이전트는 프리셋으로 계정에 저장해 다른 그래프에 끌어다 넣고, JSON으로 팀원과 주고받습니다. |
+| **에이전트 마켓** `/agents` | 프리셋을 링크로 공유하거나 공개 갤러리에 올리고, 다른 사람이 만든 에이전트를 검색해 내 그래프에 Sub-agent로 붙이거나 복제합니다. 공개는 직접 작성한 코드가 없는 에이전트만 가능하고(DB 제약으로 강제), 신뢰 배지는 보는 사람의 브라우저에서 직접 계산합니다. |
 | **현업용 편집** | 노드별 모델 지정, 커스텀 `@tool`, 서브그래프·프로젝트를 넘나드는 복사/붙여넣기, ⌘K 노드 검색, `agentlab.json` 가져오기/내보내기. |
 | **실행 전 구조 분석** | 끝나지 않는 루프, 출구 없는 노드, 도달할 수 없는 노드, 잘못된 식별자, 라우터·평가자 규칙 위반을 실행 전에 빨간색으로, 병목과 위험을 노란색으로 표시합니다. |
 | **샌드박스 실행 + 실시간 트레이스** | 서버의 격리된 프로세스에서 코드를 실행하고, 그래프 → 노드 → LLM·도구 실행 트리와 입력 State, 반환값, 토큰을 실시간으로 보여 줍니다. 캔버스에서는 실행 중인 노드가 강조됩니다. |
@@ -35,7 +36,7 @@
 | 실제 모델(gpt-5-mini) 실행 | **10/12** (실패 2건은 90초 실행 상한 초과, 코드 오류 아님) | [EVAL.md §4](docs/EVAL.md#4-실제-모델-gpt-5-mini-패턴-12종--1회) |
 | 구조 분석기 결함 검출률 | **97/97**, 정상 변경 오탐 **0/48** | [EVAL.md §2](docs/EVAL.md#2-구조-분석기-결함-주입-실험) |
 | 분석기가 없을 때 결함의 결과 | 예외 57% · 무한 루프 11% · **아무 증상 없음 32%** | [EVAL.md §3](docs/EVAL.md#3-분석기가-막지-않았다면) |
-| 자동 테스트 | 백엔드 71 · 프론트엔드 86 · 강의 코드 162 | [CI](.github/workflows/ci.yml) |
+| 자동 테스트 | 백엔드 71 · 프론트엔드 89 · DB 권한 22 · 강의 코드 162 | [CI](.github/workflows/ci.yml) |
 | 정적 검사 | ruff · ESLint · tsc 경고 0 | CI |
 
 ## 아키텍처
@@ -104,7 +105,8 @@ CI에서 강의 코드 162개를 모두 실행하게 만들자, **가상 메모�
 frontend/
   src/lib/playground/      그래프 모델 · 구조 분석기(analyze.ts) · 코드 생성기(codegen/) · 패턴
   src/lib/playground/subgraph.ts  서브그래프 순회 · 묶기/펼치기
-  src/lib/presets.ts       에이전트 프리셋 (Supabase agent_presets · 브라우저 저장)
+  src/lib/presets.ts       에이전트 프리셋 · 마켓 (Supabase agent_presets · 브라우저 저장)
+  src/components/market/   에이전트 마켓 (갤러리 · 상세 · 신뢰 배지)
   src/lib/trace.ts         실행 트레이스 → 트리 모델
   src/components/playground/  캔버스 · 툴바 · 패널 · 공유 실행 확인
   src/components/ide/      Monaco 에디터 · 콘솔 · 트레이스 패널
@@ -121,7 +123,8 @@ backend/
   tests/                   pytest (fixtures/patterns.json: 프론트 생성 코드)
   scripts/                 강의 코드 검증 · eval
 docs/                      아키텍처 · 설계 결정 · eval · 현업 준비(PRODUCTION_READINESS) · 스크린샷
-supabase/schema.sql        projects · agent_presets 테이블 · RLS 정책
+supabase/schema.sql        projects · agent_presets(마켓) 테이블 · RLS 정책
+supabase/tests/            스키마 · RLS · 권한 테스트 (Postgres 에서 실행)
 ```
 
 ## 로컬에서 실행
@@ -150,6 +153,8 @@ cd backend && uv run python scripts/check_content.py # 강의 예제·정답 162
 cd frontend && npm test                              # 구조 분석기 · 코드 생성기 스냅샷 · 서브그래프 · 트레이스 모델
 cd frontend && npm run lint && npm run typecheck
 cd frontend && npm run export:patterns               # 생성기를 바꾼 뒤 백엔드 fixture 갱신
+
+psql -f supabase/tests/stub.sql -f supabase/schema.sql -f supabase/tests/rls_test.sql   # 빈 Postgres 에서 RLS·권한 검증
 ```
 
 > 스레드가 많은 개발 PC에서는 `AGENTLAB_NPROC_LIMIT=0`이 필요할 수 있습니다. 테스트에서는 자동으로 설정됩니다.
@@ -191,6 +196,7 @@ eval 재현 방법은 [docs/EVAL.md](docs/EVAL.md)에 있습니다.
 - **API 키:** 기본은 이 탭(sessionStorage)에만 보관되고 설정에서 "계속 기억"을 켜야 localStorage 에 남습니다. 실행 요청 헤더로만 전달됩니다. 서버는 키를 저장하거나 기록하지 않습니다. **실행 코드에는 가짜 키만 넘기고**, 키 주입 프록시가 허용된 OpenAI 추론 엔드포인트에만 진짜 키를 붙입니다.
 - **공유 코드:** 다른 사람이 작성한 코드(수정한 파일, 서브 에이전트 안쪽까지의 Function 노드 코드, 커스텀 도구)가 있는 공유 프로젝트를 내 키로 실행하기 전에 확인을 받습니다. Mock 모드로 실행하는 선택지도 있습니다.
 - **요청 한도:** 요청 본문·파일 크기 상한, IP별 분당 한도(`X-Forwarded-For`는 신뢰하는 프록시가 덧붙인 오른쪽 값을 사용)와 사용자별 하루 한도, Cloud Run 최대 인스턴스로 비용 상한을 둡니다.
+- **에이전트 마켓:** 공개 갤러리는 Function 노드·커스텀 도구가 없는 선언형 에이전트만 받습니다(DB 제약). 링크 공유는 id 를 아는 사람만 RPC 로 열 수 있어 목록 조회로 훑을 수 없고, 작성자 이름·설치 수·숨김 여부는 열 단위 권한으로 클라이언트가 바꿀 수 없습니다. 신고 5건이면 자동으로 숨깁니다.
 - **데이터:** 프로젝트 접근은 Postgres RLS가 정합니다. 사이트에는 보안 헤더(`X-Frame-Options`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`)를 붙입니다.
 
 ## 알려진 한계
