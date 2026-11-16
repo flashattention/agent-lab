@@ -4,7 +4,7 @@ import { toolCatalog } from "../catalog.ts";
 import { allNodes } from "../subgraph.ts";
 import type { GEdge, GNode, GraphSettings, SubGraph } from "../types.ts";
 
-export const GENERATOR_VERSION = "2026.11-1";
+export const GENERATOR_VERSION = "2026.11-2";
 
 export const VIRTUAL = new Set(["start", "end", "router", "map"]);
 
@@ -104,11 +104,19 @@ export function boundTools(c: Ctx, n: GNode): string[] {
     const r = c.byId.get(e.target);
     if (r?.kind !== "router" || r.data.strategy !== "tools_condition") continue;
     for (const e2 of c.out.get(r.id) ?? []) {
-      const t = c.byId.get(e2.target);
-      if (t?.kind === "tools") (t.data.tools ?? []).forEach((x) => c.tools[x] && tools.add(x));
+      const t = toolsBehind(c, e2.target);
+      if (t) (t.data.tools ?? []).forEach((x) => c.tools[x] && tools.add(x));
     }
   }
   return [...tools];
+}
+
+/** id 가 Tools 노드면 그 노드, 승인하면 Tools 로 가는 Human 노드면 그 뒤의 Tools 노드 */
+export function toolsBehind(c: Ctx, id: string): GNode | undefined {
+  const t = c.byId.get(id);
+  if (t?.kind === "tools") return t;
+  if (t?.kind !== "human") return undefined;
+  return (c.out.get(id) ?? []).filter((e) => e.sourceHandle !== "reject").map((e) => c.byId.get(e.target)).find((x) => x?.kind === "tools");
 }
 
 export const isMapWorker = (c: Ctx, n: GNode) => (c.inc.get(n.id) ?? []).some((e) => c.byId.get(e.source)?.kind === "map");

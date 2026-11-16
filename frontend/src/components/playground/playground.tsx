@@ -34,6 +34,7 @@ import { customCodeNodes } from "@/lib/playground/custom-code";
 import { CANVAS_TAB, currentPath, toGraph, toSub, usePlayground } from "./store";
 import { PresetsDialog, SavePresetDialog } from "./presets-dialog";
 import { NodeSearch } from "./node-search";
+import { AgentLoopDialog } from "./agent-loop-dialog";
 import { usePlaygroundUI } from "./ui-store";
 import { useProjectSync } from "./use-project-sync";
 import { useAuth } from "@/lib/auth";
@@ -390,7 +391,7 @@ function Workspace() {
       const el = e.target as HTMLElement | null;
       if (el?.closest("input, textarea, select, [contenteditable=true], .monaco-editor, [role=dialog]")) return;
       const ui = usePlaygroundUI.getState();
-      if (ui.libraryOpen || ui.saveDraft) return;
+      if (ui.libraryOpen || ui.saveDraft || ui.agentDialog) return;
       const st = usePlayground.getState();
       if (st.stack.length && st.activeTab === CANVAS_TAB) st.exitTo(st.stack.length - 1);
     };
@@ -590,6 +591,7 @@ function Workspace() {
       />
       <PresetsDialog onInsert={(p) => addPreset(p)} />
       <SavePresetDialog />
+      <AgentLoopDialog />
       <NodeSearch
         open={searchOpen}
         onClose={() => setSearchOpen(false)}

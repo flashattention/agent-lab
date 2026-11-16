@@ -24,7 +24,7 @@ CACHE_DB = Path(os.getenv("AGENTLAB_CACHE_DB", Path(__file__).resolve().parent.p
 # Cloud Run 처럼 디스크가 휘발성이고 인스턴스가 여러 개인 환경에서는 GCS 버킷을 공유 캐시로 쓴다.
 CACHE_BUCKET = os.getenv("AGENTLAB_CACHE_BUCKET")
 REFINE_MODEL = os.getenv("AGENTLAB_REFINE_MODEL", "gpt-5")
-GENERATOR_VERSION = "2026.11-1"  # frontend/src/lib/playground/codegen/context.ts 와 맞춘다
+GENERATOR_VERSION = "2026.11-2"  # frontend/src/lib/playground/codegen/context.ts 와 맞춘다
 
 # 프롬프트를 바꾸면 올린다. 캐시 키에 들어가므로 이전 프롬프트의 결과와 섞이지 않는다.
 PROMPT_VERSION = "2"

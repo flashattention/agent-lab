@@ -2,7 +2,7 @@
 
 import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { AlertTriangle, CircleCheck, CircleX, Link2, Loader2, Maximize2, OctagonAlert, Pause } from "lucide-react";
+import { AlertTriangle, CircleCheck, CircleX, Layers, Link2, Loader2, Maximize2, OctagonAlert, Pause } from "lucide-react";
 import { KINDS, toolCatalog } from "@/lib/playground/catalog";
 import { summarize } from "@/lib/playground/subgraph";
 import { cn } from "@/lib/utils";
@@ -132,6 +132,12 @@ export const AgentNode = memo(function AgentNode({ id, data, selected }: NodePro
             </div>
           )}
           {!detail && !tools.length && data.prompt && <div className="line-clamp-2 text-[11px] leading-snug text-muted">{data.prompt}</div>}
+          {data.kind === "agent" && data.middleware && (
+            <div className="mt-1 flex items-center gap-1 text-[10px] text-accent" title="더블클릭해 루프·미들웨어 설정">
+              <Layers className="h-3 w-3" /> 미들웨어 {Object.keys(data.middleware).length}
+              {data.middleware.hitl && <span className="rounded bg-accent-soft px-1">승인</span>}
+            </div>
+          )}
         </div>
       )}
 

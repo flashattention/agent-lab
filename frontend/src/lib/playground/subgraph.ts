@@ -201,3 +201,58 @@ export function flattenNode(level: SubGraph, nodeId: string): Result {
   }
   return { ok: true, nodeId: moved[0].id, graph: { nodes: [...level.nodes.filter((n) => n.id !== nodeId), ...moved], edges } };
 }
+
+/* ------------------------------------------------------------------ Agent → 그래프로 꺼내기 */
+
+export type EjectItem = { label: string; status: "kept" | "approx" | "lost"; note: string };
+
+/**
+ * create_agent 노드를 같은 일을 하는 명시적 그래프(LLM ↔ 도구 루프)로 바꾼다.
+ * 미들웨어 중 그래프로 옮길 수 있는 것은 옮기고, 무엇이 유지·근사·사라지는지 보고한다.
+ */
+export function ejectAgent(n: GNode): { graph: SubGraph; report: EjectItem[] } {
+  const d = n.data;
+  const mw = d.middleware ?? {};
+  const tools = d.tools ?? [];
+  const pos = (x: number, y: number) => ({ x, y });
+  const nodes: GNode[] = [
+    { id: "start", kind: "start", data: { name: "__start__" }, position: pos(50, 0) },
+    { id: "model", kind: "llm", data: { name: "model", prompt: d.prompt, ...(d.model ? { model: d.model } : {}) }, position: pos(0, 110) },
+    { id: "end", kind: "end", data: { name: "__end__" }, position: pos(50, 480) },
+  ];
+  const edges: GEdge[] = [{ id: "e-start", source: "start", target: "model" }];
+  const approval = !!mw.hitl?.tools.length && tools.length > 0;
+  if (tools.length) {
+    nodes.push(
+      { id: "should_continue", kind: "router", data: { name: "should_continue", strategy: "tools_condition" }, position: pos(0, 240) },
+      { id: "tools", kind: "tools", data: { name: "tools", tools: [...tools] }, position: pos(300, 380) },
+    );
+    edges.push({ id: "e-route", source: "model", target: "should_continue" }, { id: "e-done", source: "should_continue", target: "end" }, { id: "e-back", source: "tools", target: "model" });
+    if (approval) {
+      nodes.push({ id: "approval", kind: "human", data: { name: "approval", prompt: `도구 실행을 승인하시겠습니까? (${mw.hitl!.tools.join(", ")})` }, position: pos(300, 260) });
+      edges.push(
+        { id: "e-ask", source: "should_continue", target: "approval" },
+        { id: "e-ok", source: "approval", target: "tools", sourceHandle: "approve" },
+        { id: "e-no", source: "approval", target: "model", sourceHandle: "reject" },
+      );
+    } else edges.push({ id: "e-tools", source: "should_continue", target: "tools" });
+  } else edges.push({ id: "e-end", source: "model", target: "end" });
+
+  const report: EjectItem[] = [
+    { label: "프롬프트 · 도구 · 모델", status: "kept", note: "안쪽 model / tools 노드로 옮깁니다." },
+    { label: "컨텍스트 격리", status: "kept", note: "격리 모드 Sub-agent 라서 최종 답변만 부모로 돌아갑니다." },
+    { label: "create_agent 내장 처리", status: "approx", note: "도구 오류는 ToolNode(handle_tool_errors=True)가 처리합니다. 이후 라이브러리 개선은 자동으로 반영되지 않습니다." },
+  ];
+  if (mw.hitl)
+    report.push(
+      approval
+        ? { label: "도구 실행 전 승인", status: "approx", note: `Human 노드로 옮깁니다. 선택한 도구(${mw.hitl.tools.join(", ")})뿐 아니라 모든 도구 호출 전에 승인을 받습니다(더 엄격).` }
+        : { label: "도구 실행 전 승인", status: "lost", note: "승인할 도구를 고르지 않아 옮길 것이 없습니다." },
+    );
+  if (mw.retry) report.push({ label: "재시도", status: "approx", note: "model 노드에는 RetryPolicy(max_attempts=3)가 자동으로 붙습니다. 도구 재시도는 사라집니다." });
+  if (mw.modelCallLimit || mw.toolCallLimit) report.push({ label: "호출 상한", status: "lost", note: "recursion_limit 만 안전장치로 남습니다. 필요하면 Evaluator 로 반복 상한을 두세요." });
+  if (mw.summarization) report.push({ label: "대화 요약", status: "lost", note: "긴 대화를 요약하지 않습니다." });
+  if (mw.pii) report.push({ label: "PII 마스킹", status: "lost", note: "사용자 입력의 개인정보를 가리지 않습니다." });
+  if (mw.fallback) report.push({ label: "대체 모델", status: "lost", note: "기본 모델이 실패해도 다른 모델로 넘어가지 않습니다." });
+  return { graph: { nodes, edges }, report };
+}

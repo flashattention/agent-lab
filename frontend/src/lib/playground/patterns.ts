@@ -66,14 +66,23 @@ export const PATTERNS: Pattern[] = [
   {
     id: "prebuilt-agent",
     title: "create_agent 한 줄 에이전트",
-    summary: "LangChain v1 create_agent 로 만든 완성형 에이전트를 노드 하나로 사용.",
+    summary: "LangChain v1 create_agent 로 만든 완성형 에이전트를 노드 하나로 사용. 호출 상한·재시도 미들웨어 포함 (더블클릭해 설정).",
     category: "기초",
     difficulty: "초급",
     why: "빠른 프로토타이핑. 미들웨어로 확장하는 표준 진입점.",
     graph: build(
       [
         ["start", "START"],
-        ["agent", "travel_agent", { prompt: "당신은 친절한 여행 플래너입니다.", tools: ["get_weather", "web_search"], description: "날씨와 여행 정보를 조사" }],
+        [
+          "agent",
+          "travel_agent",
+          {
+            prompt: "당신은 친절한 여행 플래너입니다.",
+            tools: ["get_weather", "web_search"],
+            description: "날씨와 여행 정보를 조사",
+            middleware: { modelCallLimit: 10, toolCallLimit: 20, retry: { maxRetries: 2 } },
+          },
+        ],
         ["end", "END"],
       ],
       [

@@ -9,6 +9,7 @@ import type { NodeKind } from "@/lib/playground/types";
 import { cn } from "@/lib/utils";
 import { AgentNode } from "./agent-node";
 import { usePlayground, type FlowNode } from "./store";
+import { usePlaygroundUI } from "./ui-store";
 
 const nodeTypes = { agent: AgentNode };
 
@@ -64,6 +65,7 @@ export function Canvas({
         onNodeClick={(_, n) => select(n.id)}
         onNodeDoubleClick={(_, n) => {
           if (n.data.kind === "subgraph") enter(n.id);
+          else if (n.data.kind === "agent") usePlaygroundUI.getState().setAgentDialog(n.id);
         }}
         zoomOnDoubleClick={false}
         onPaneClick={() => select(null)}

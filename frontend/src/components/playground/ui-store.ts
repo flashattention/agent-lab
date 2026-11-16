@@ -22,6 +22,8 @@ type UIState = {
   openSave: (d: SaveDraft | null) => void;
   libraryOpen: boolean;
   setLibraryOpen: (v: boolean) => void;
+  agentDialog: string | null; // 루프·미들웨어 창을 연 Agent 노드 id
+  setAgentDialog: (id: string | null) => void;
 };
 
 /** 플레이그라운드 여러 패널이 함께 쓰는 화면 상태 (저장되지 않음) */
@@ -32,4 +34,6 @@ export const usePlaygroundUI = create<UIState>()((set) => ({
   openSave: (saveDraft) => set({ saveDraft }),
   libraryOpen: false,
   setLibraryOpen: (libraryOpen) => set({ libraryOpen }),
+  agentDialog: null,
+  setAgentDialog: (agentDialog) => set({ agentDialog }),
 }));

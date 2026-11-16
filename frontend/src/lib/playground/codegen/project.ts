@@ -7,7 +7,8 @@ import { VIRTUAL, py } from "./context.ts";
 export function mainFile(c: Ctx): string {
   const s = c.g.settings;
   const everything = allNodes(c.g);
-  const hasHuman = everything.some((n) => n.kind === "human");
+  // Human 노드와 Agent 의 승인 미들웨어는 둘 다 interrupt 로 멈춘다 (재개 값 형식은 다르다)
+  const hasHuman = everything.some((n) => n.kind === "human" || (n.kind === "agent" && !!n.data.middleware?.hitl));
   const hasSub = everything.some((n) => n.kind === "subgraph");
   const trace = `"run_name": "agentlab-demo", "tags": ["agentlab", "demo"], "metadata": {"source": "agentlab-playground"}`;
   const cfg = s.checkpointer !== "none" ? `{"configurable": {"thread_id": str(uuid.uuid4())}, "recursion_limit": ${s.recursionLimit}, ${trace}}` : `{"recursion_limit": ${s.recursionLimit}, ${trace}}`;
@@ -42,8 +43,8 @@ def show(update: object) -> None:
 
 ${
   hasSub
-    ? `def run(graph, payload, config) -> bool:
-    """스트리밍 실행. interrupt 가 발생하면 True 를 반환한다.
+    ? `def run(graph, payload, config) -> list:
+    """스트리밍 실행. interrupt 가 발생하면 그 값들을, 끝까지 돌면 빈 리스트를 반환한다.
 
     subgraphs=True 로 서브 에이전트 내부 노드의 업데이트도 함께 받는다.
     ns(namespace)는 ("researcher:<task id>", ...) 처럼 바깥 → 안쪽 순서의 경로다.
@@ -54,21 +55,36 @@ ${
             if node == "__interrupt__":
                 for it in update:
                     print(f"\\n⏸  interrupt ({where.rstrip(' ›') or 'root'}): {it.value}")
-                return True
+                return [it.value for it in update]
             print(f"\\n{'  ' * len(ns)}▶ {where}{node}")
             show(update)
-    return False`
-    : `def run(graph, payload, config) -> bool:
-    """스트리밍 실행. interrupt 가 발생하면 True 를 반환한다."""
+    return []`
+    : `def run(graph, payload, config) -> list:
+    """스트리밍 실행. interrupt 가 발생하면 그 값들을, 끝까지 돌면 빈 리스트를 반환한다."""
     for chunk in graph.stream(payload, config, stream_mode="updates"):
         for node, update in chunk.items():
             if node == "__interrupt__":
                 for it in update:
                     print(f"\\n⏸  interrupt: {it.value}")
-                return True
+                return [it.value for it in update]
             print(f"\\n▶ {node}")
             show(update)
-    return False`
+    return []`
+}
+${
+  hasHuman
+    ? `
+
+def approve(value: object) -> object:
+    """데모용 재개 값: 사람이 모두 승인했다고 가정한다.
+
+    Agent 의 승인 미들웨어(HumanInTheLoopMiddleware)는 {"decisions": [...]} 로,
+    Human 노드는 {"approved": ...} 로 재개한다. 결정 종류: approve / edit / reject / respond.
+    """
+    if isinstance(value, dict) and "action_requests" in value:
+        return {"decisions": [{"type": "approve"} for _ in value["action_requests"]]}
+    return {"approved": True}`
+    : ""
 }
 
 
@@ -86,7 +102,7 @@ ${
         while interrupted and resumes < 5:
             resumes += 1
             print("👤 승인 → Command(resume=...) 로 재개")
-            interrupted = run(graph, Command(resume={"approved": True}), config)`
+            interrupted = run(graph, Command(resume=approve(interrupted[0])), config)`
     : `        if interrupted:
             print("(interrupt 발생 — Command(resume=...) 로 재개하세요)")`
 }

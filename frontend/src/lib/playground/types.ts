@@ -31,12 +31,25 @@ export type NodeData = {
   code?: string; // function 노드 본문
   description?: string; // supervisor 가 worker 를 고를 때 참고하는 설명
   model?: string; // 노드별 모델 (init_chat_model 형식, 예: "openai:gpt-5"). 비우면 LAB_MODEL
+  middleware?: AgentMiddleware; // agent 전용: create_agent(middleware=[...])
   // subgraph 전용
   graph?: SubGraph; // 안쪽 그래프 (START/END 를 가진 완결된 그래프). 설정은 최상위 그래프를 따른다.
   io?: SubgraphIO;
   memory?: SubgraphMemory;
   preset?: PresetLink; // 프리셋에서 가져온 경우 출처
 };
+
+/** Agent(create_agent) 노드의 미들웨어. 켠 것만 값이 있다. langchain.agents.middleware 1.4 기준 */
+export type AgentMiddleware = {
+  hitl?: { tools: string[] }; // HumanInTheLoopMiddleware: 이 도구들은 실행 전에 사람 승인
+  modelCallLimit?: number; // ModelCallLimitMiddleware(run_limit=N)
+  toolCallLimit?: number; // ToolCallLimitMiddleware(run_limit=N)
+  summarization?: { tokens: number }; // SummarizationMiddleware(trigger=("tokens", N))
+  retry?: { maxRetries: number }; // ModelRetryMiddleware + ToolRetryMiddleware
+  fallback?: string; // ModelFallbackMiddleware(모델 ID)
+  pii?: { types: PiiType[]; strategy: "redact" | "mask" | "hash" | "block" }; // PIIMiddleware (사용자 입력)
+};
+export type PiiType = "email" | "credit_card" | "ip" | "mac_address" | "url";
 
 /** 서브그래프와 부모 그래프가 상태를 주고받는 방식 */
 export type SubgraphIO =

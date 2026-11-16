@@ -61,11 +61,13 @@ ${sup ? `    # Supervisor 가 누가 답했는지 알 수 있도록 이름을 �
     case "agent": {
       const tools = (n.data.tools ?? []).filter((t) => c.tools[t]);
       const mapWorker = isMapWorker(c, n);
+      const mw = middlewareCode(c, n, tools);
       return `${header(`'${name}' — create_agent 로 만든 완성형 ReAct 에이전트를 노드로 사용한다.
 
 에이전트 내부에서 모델 호출 ↔ 도구 실행 루프가 돌고, 최종 답변만 부모 그래프로 돌려준다
 (컨텍스트 격리: 부모 대화에 도구 호출 기록이 쌓이지 않는다).`, [
         "from langchain.agents import create_agent",
+        ...(mw.classes.length ? [`from langchain.agents.middleware import ${mw.classes.join(", ")}`] : []),
         mapWorker ? "from langchain.messages import HumanMessage" : "from langchain.messages import AIMessage",
         "",
         ...(n.data.model?.trim() ? [] : ["from agent.config import MODEL"]),
@@ -78,7 +80,7 @@ _agent = create_agent(
     ${agentModelExpr(c, n)},
     tools=[${tools.map((t) => `TOOLS[${py(t)}]`).join(", ")}],
     system_prompt=PROMPT,
-    name=${py(name)},
+${mw.lines.length ? `    middleware=[\n${mw.lines.join("\n")}\n    ],\n` : ""}    name=${py(name)},
 )
 
 
@@ -139,7 +141,7 @@ ${indent(n.data.code?.trim() || "return {}")}
 interrupt() 는 그래프 실행을 멈추고 값을 클라이언트에 전달한다. 체크포인터가 상태를 저장해 두므로
 나중에 graph.invoke(Command(resume=...), config) 로 같은 thread 를 이어서 실행할 수 있다.
 주의: 재개 시 이 노드는 '처음부터' 다시 실행되므로 interrupt 이전에 부작용(side effect)을 두지 않는다.`, [
-        "from langchain.messages import HumanMessage",
+        "from langchain.messages import HumanMessage, ToolMessage",
         "from langgraph.types import interrupt",
         "",
         `from ${c.pkg}.state import State`,
@@ -148,15 +150,23 @@ QUESTION = ${py(n.data.prompt ?? "승인하시겠습니까?")}
 
 
 def ${name}(state: State) -> dict:
-    """사람의 승인/거절과 피드백을 받는다."""
+    """사람의 승인/거절과 피드백을 받는다. 직전 메시지가 도구 호출이면 그 호출을 승인받는다."""
     last = state["messages"][-1]
-    decision = interrupt({"question": QUESTION, "draft": last.text})
+    calls = getattr(last, "tool_calls", None) or []
+    request: dict = {"question": QUESTION, "draft": last.text}
+    if calls:
+        request["tool_calls"] = [{"name": c["name"], "args": c["args"]} for c in calls]
+    decision = interrupt(request)
     if not isinstance(decision, dict):
         decision = {"approved": bool(decision)}
     approved = decision.get("approved", True)
     update: dict = {${py(`${n.data.name}_decision`)}: "approve" if approved else "reject"}
-    if not approved and decision.get("feedback"):
-        update["messages"] = [HumanMessage(f"[검토자 피드백] {decision['feedback']}")]
+    feedback = decision.get("feedback") or ""
+    if not approved and calls:
+        # 도구 호출마다 응답(ToolMessage)이 있어야 모델이 대화를 이어갈 수 있다 (tool_calls 프로토콜)
+        update["messages"] = [ToolMessage(content=f"[검토자 거절] {feedback or '실행하지 않았습니다.'}", tool_call_id=c["id"]) for c in calls]
+    elif not approved and feedback:
+        update["messages"] = [HumanMessage(f"[검토자 피드백] {feedback}")]
     return update
 ${hasReject ? "" : "\n# reject 경로가 연결되지 않아 승인 여부와 관계없이 다음 노드로 진행합니다.\n"}`;
     }
@@ -315,4 +325,26 @@ def ${name}(state: State) -> dict:
 `;
   }
   return "";
+}
+
+/** Agent 노드의 미들웨어 → create_agent(middleware=[...]) 항목. 리스트의 앞쪽이 바깥에서 감싼다. */
+export function middlewareCode(c: Ctx, n: GNode, tools: string[]): { classes: string[]; lines: string[] } {
+  const mw = n.data.middleware;
+  const items: [cls: string, code: string, comment: string][] = [];
+  if (!mw) return { classes: [], lines: [] };
+  if (mw.summarization)
+    items.push(["SummarizationMiddleware", `SummarizationMiddleware(${agentModelExpr(c, n)}, trigger=("tokens", ${mw.summarization.tokens}))`, `대화가 ${mw.summarization.tokens} 토큰을 넘으면 오래된 메시지를 요약으로 바꾼다`]);
+  for (const t of mw.pii?.types ?? [])
+    items.push(["PIIMiddleware", `PIIMiddleware(${py(t)}, strategy=${py(mw.pii!.strategy)})`, `모델에 보내기 전 사용자 입력의 ${t} 처리`]);
+  if (mw.modelCallLimit) items.push(["ModelCallLimitMiddleware", `ModelCallLimitMiddleware(run_limit=${mw.modelCallLimit})`, `실행 한 번에 모델 호출 최대 ${mw.modelCallLimit}회 (넘으면 안내 메시지로 끝낸다)`]);
+  if (mw.toolCallLimit) items.push(["ToolCallLimitMiddleware", `ToolCallLimitMiddleware(run_limit=${mw.toolCallLimit})`, `실행 한 번에 도구 호출 최대 ${mw.toolCallLimit}회 (넘는 호출은 오류 메시지로 막고 계속한다)`]);
+  if (mw.retry) {
+    items.push(["ModelRetryMiddleware", `ModelRetryMiddleware(max_retries=${mw.retry.maxRetries})`, "모델 호출 실패 시 지수 백오프로 재시도"]);
+    items.push(["ToolRetryMiddleware", `ToolRetryMiddleware(max_retries=${mw.retry.maxRetries})`, "도구 실행 실패 시 재시도"]);
+  }
+  if (mw.fallback) items.push(["ModelFallbackMiddleware", `ModelFallbackMiddleware(${py(mw.fallback)})`, "기본 모델이 실패하면 이 모델로 다시 시도"]);
+  const approve = (mw.hitl?.tools ?? []).filter((t) => tools.includes(t));
+  if (approve.length)
+    items.push(["HumanInTheLoopMiddleware", `HumanInTheLoopMiddleware(interrupt_on={${approve.map((t) => `${py(t)}: True`).join(", ")}})`, "이 도구들은 실행 전에 사람 승인 (interrupt, 체크포인터 필요)"]);
+  return { classes: [...new Set(items.map((i) => i[0]))].sort(), lines: items.map(([, code, comment]) => `        # ${comment}\n        ${code},`) };
 }

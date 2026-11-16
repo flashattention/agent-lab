@@ -7,7 +7,7 @@ import dagre from "@dagrejs/dagre";
 import type { Graph, GraphSettings, NodeData, NodeKind, SubGraph } from "@/lib/playground/types";
 import { DEFAULT_SETTINGS } from "@/lib/playground/types";
 import { defaultData, KINDS } from "@/lib/playground/catalog";
-import { allNodes, cloneSub, flattenNode, groupNodes, needsLayout, uniqueIn } from "@/lib/playground/subgraph";
+import { allNodes, cloneSub, ejectAgent as ejectAgentGraph, flattenNode, groupNodes, needsLayout, uniqueIn } from "@/lib/playground/subgraph";
 
 export type FlowData = NodeData & { kind: NodeKind };
 export type FlowNode = Node<FlowData, "agent">;
@@ -82,6 +82,7 @@ type PlaygroundState = {
   paste: () => number;
   duplicate: () => number;
   importGraph: (g: Graph) => void;
+  ejectAgent: (nodeId: string) => boolean;
 };
 
 const CLIPBOARD_KEY = "agentlab-clipboard";
@@ -477,6 +478,21 @@ export const usePlayground = create<PlaygroundState>()(
           tabs: [CANVAS_TAB],
           activeTab: CANVAS_TAB,
         });
+      },
+      ejectAgent: (nodeId) => {
+        const node = get().nodes.find((n) => n.id === nodeId);
+        if (!node || node.data.kind !== "agent") return false;
+        const { kind, ...data } = node.data;
+        void kind;
+        const { graph } = ejectAgentGraph({ id: node.id, kind: "agent", data, position: node.position });
+        remember();
+        // 같은 id 를 유지하므로 연결선이 그대로 남는다
+        set({
+          nodes: get().nodes.map((n) =>
+            n.id === nodeId ? { ...n, data: { kind: "subgraph", name: data.name, description: data.description, io: "isolated", memory: "inherit", graph } } : n,
+          ),
+        });
+        return true;
       },
       ungroup: (nodeId) => {
         const r = flattenNode(level(), nodeId);

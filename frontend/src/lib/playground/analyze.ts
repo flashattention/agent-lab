@@ -76,6 +76,12 @@ function analyzeLevel(graph: SubGraph, settings: GraphSettings, path: string[], 
     inc.get(e.target)!.push(e);
   }
   const where = trail.length ? `[${trail.join(" › ")}] ` : "";
+  /** Tools 노드이거나, 승인하면 Tools 노드로 가는 Human 노드인가 */
+  const isToolPath = (id: string) => {
+    const t = byId.get(id);
+    if (t?.kind === "tools") return true;
+    return t?.kind === "human" && (out.get(id) ?? []).some((x) => x.sourceHandle !== "reject" && byId.get(x.target)?.kind === "tools");
+  };
   const err = (message: string, hint?: string, ns: string[] = [], es: string[] = []) =>
     issues.push({ level: "error", message: where + message, hint, nodes: ns, edges: es, path });
   const warn = (message: string, hint?: string, ns: string[] = [], es: string[] = []) =>
@@ -240,7 +246,8 @@ function analyzeLevel(graph: SubGraph, settings: GraphSettings, path: string[], 
             warn(`'${p.data.name}' 에서 라우터와 다른 노드로 동시에 나갑니다 → 병렬 실행됩니다.`, "의도한 것이 아니라면 라우터 하나로 모든 분기를 처리하세요.", [p.id], (out.get(p.id) ?? []).map((x) => x.id));
         }
         if (n.data.strategy === "tools_condition") {
-          const toolTargets = o.filter((e) => byId.get(e.target)?.kind === "tools");
+          // 도구로 가는 경로: Tools 노드로 바로, 또는 Human 승인 노드를 거쳐(승인 시) Tools 노드로
+          const toolTargets = o.filter((e) => isToolPath(e.target));
           if (toolTargets.length !== 1) err(`tools_condition 라우터 '${name}' 는 정확히 하나의 Tools 노드로 연결되어야 합니다.`, undefined, [n.id]);
           if (o.length - toolTargets.length !== 1) err(`tools_condition 라우터 '${name}' 는 도구 외 경로(보통 END)가 정확히 하나 필요합니다.`, undefined, [n.id]);
         }
@@ -268,7 +275,10 @@ function analyzeLevel(graph: SubGraph, settings: GraphSettings, path: string[], 
       }
       case "tools": {
         if (!n.data.tools?.length) err(`Tools 노드 '${name}' 에 도구가 하나도 없습니다.`, "속성 패널에서 도구를 선택하세요.", [n.id]);
-        const fromRouter = i.some((e) => byId.get(e.source)?.kind === "router" && byId.get(e.source)?.data.strategy === "tools_condition");
+        const viaRouter = (id: string) => byId.get(id)?.kind === "router" && byId.get(id)?.data.strategy === "tools_condition";
+        const fromRouter = i.some(
+          (e) => viaRouter(e.source) || (byId.get(e.source)?.kind === "human" && e.sourceHandle !== "reject" && (inc.get(e.source) ?? []).some((x) => viaRouter(x.source))),
+        );
         if (!fromRouter)
           warn(`Tools 노드 '${name}' 앞에 tools_condition 라우터가 없습니다.`, "LLM 이 도구를 요청하지 않아도 항상 실행되어 오류가 날 수 있습니다.", [n.id], i.map((e) => e.id));
         const back = o.some((e) => ["llm", "agent"].includes(byId.get(e.target)?.kind ?? ""));
@@ -335,7 +345,29 @@ function analyzeLevel(graph: SubGraph, settings: GraphSettings, path: string[], 
 
   /* ---------------------------------------------------------- 민감 도구 & 직렬 LLM 체인 */
   const catalog = toolCatalog(settings);
-  const sensitiveUsers = nodes.filter((n) => (n.data.tools ?? []).some((t) => catalog[t]?.sensitive) && ["tools", "agent"].includes(n.kind));
+  // Agent 가 승인 미들웨어로 민감한 도구를 모두 막고 있으면 승인 절차가 있는 것으로 본다
+  const unguarded = (n: GNode) => (n.data.tools ?? []).filter((t) => catalog[t]?.sensitive && !(n.kind === "agent" && n.data.middleware?.hitl?.tools.includes(t)));
+  const sensitiveUsers = nodes.filter((n) => ["tools", "agent"].includes(n.kind) && unguarded(n).length > 0);
+  for (const n of nodes) {
+    const mw = n.kind === "agent" ? n.data.middleware : undefined;
+    if (!mw) continue;
+    const name = n.data.name;
+    if (mw.hitl) {
+      if (settings.checkpointer === "none")
+        err(`Agent '${name}' 의 승인 미들웨어는 interrupt 를 쓰므로 Checkpointer 가 필요합니다.`, "그래프 설정에서 Checkpointer 를 memory 또는 sqlite 로 바꾸세요.", [n.id]);
+      const stray = mw.hitl.tools.filter((t) => !(n.data.tools ?? []).includes(t));
+      if (!mw.hitl.tools.length) warn(`Agent '${name}' 의 승인 미들웨어에 승인받을 도구가 없습니다.`, "승인할 도구를 고르거나 미들웨어를 끄세요.", [n.id]);
+      else if (stray.length) warn(`Agent '${name}' 의 승인 대상 ${stray.join(", ")} 는 이 Agent 의 도구가 아닙니다.`, undefined, [n.id]);
+    }
+    for (const [label, v] of [["모델 호출 상한", mw.modelCallLimit], ["도구 호출 상한", mw.toolCallLimit], ["재시도 횟수", mw.retry?.maxRetries]] as const)
+      if (v !== undefined && !(Number.isInteger(v) && v >= 1)) err(`Agent '${name}' 의 ${label}은 1 이상의 정수여야 합니다.`, undefined, [n.id]);
+    if (mw.summarization && !(mw.summarization.tokens >= 500)) err(`Agent '${name}' 의 요약 기준 토큰은 500 이상이어야 합니다.`, undefined, [n.id]);
+    if (mw.pii && !mw.pii.types.length) warn(`Agent '${name}' 의 PII 마스킹에 고른 종류가 없습니다.`, undefined, [n.id]);
+    if (mw.fallback !== undefined) {
+      if (!/^[a-z_]+:[\w.\-/]+$/.test(mw.fallback)) err(`Agent '${name}' 의 대체 모델 '${mw.fallback}' 형식이 잘못되었습니다.`, "init_chat_model 형식: 공급자:모델", [n.id]);
+      else if (providerOf(mw.fallback) !== "openai") warn(`Agent '${name}' 의 대체 모델은 ${providerOf(mw.fallback)} 입니다. 샌드박스는 OpenAI 만 지원합니다.`, undefined, [n.id]);
+    }
+  }
   for (const n of nodes) {
     if (!["tools", "agent"].includes(n.kind)) continue;
     const missing = (n.data.tools ?? []).filter((t) => !catalog[t]);
@@ -350,7 +382,13 @@ function analyzeLevel(graph: SubGraph, settings: GraphSettings, path: string[], 
   }
   const hasHuman = inheritedHuman || nodes.some((n) => n.kind === "human");
   if (sensitiveUsers.length && !hasHuman)
-    warn("민감한 도구(환불 등)가 승인 절차 없이 실행됩니다.", "Human-in-the-loop 노드나 HumanInTheLoopMiddleware 로 승인 단계를 두세요.", sensitiveUsers.map((n) => n.id));
+    warn(
+      "민감한 도구(환불 등)가 승인 절차 없이 실행됩니다.",
+      sensitiveUsers.some((n) => n.kind === "agent")
+        ? "Agent 를 더블클릭해 '도구 실행 전 승인' 미들웨어를 켜거나, Human-in-the-loop 노드를 두세요."
+        : "Human-in-the-loop 노드로 승인 단계를 두세요.",
+      sensitiveUsers.map((n) => n.id),
+    );
 
   // 사이클을 제외한 최장 LLM 직렬 경로
   const memo = new Map<string, number>();

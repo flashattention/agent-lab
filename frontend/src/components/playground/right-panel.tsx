@@ -2,9 +2,9 @@
 
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { Activity, Boxes, ChevronDown, Info, Library, Link2, Loader2, Maximize2, Plus, RefreshCw, Save, Settings2, Shapes, SlidersHorizontal, Trash2, Unlink, Ungroup, Wrench } from "lucide-react";
+import { Activity, Boxes, ChevronDown, Info, Layers, Library, Link2, Loader2, Maximize2, Plus, RefreshCw, Save, Settings2, Shapes, SlidersHorizontal, Trash2, Unlink, Ungroup, Wrench } from "lucide-react";
 import { CUSTOM_TOOL_TEMPLATE, KINDS, MODEL_KINDS, MODEL_SUGGESTIONS, PALETTE_ORDER, toolCatalog } from "@/lib/playground/catalog";
-import type { CustomTool, NodeKind, RouterStrategy, SubgraphIO, SubgraphMemory } from "@/lib/playground/types";
+import type { AgentMiddleware, CustomTool, NodeKind, RouterStrategy, SubgraphIO, SubgraphMemory } from "@/lib/playground/types";
 import { summarize, wrapNode } from "@/lib/playground/subgraph";
 import { getSharedPreset, usePresets, type AgentPreset } from "@/lib/presets";
 import { cn } from "@/lib/utils";
@@ -220,6 +220,8 @@ function Inspector() {
         </div>
       )}
 
+      {d.kind === "agent" && <AgentMiddlewareSummary id={node.id} />}
+
       {d.kind === "agent" && (
         <button
           onClick={() => {
@@ -261,6 +263,42 @@ function Inspector() {
           />
         </div>
       )}
+    </div>
+  );
+}
+
+export const MIDDLEWARE_LABELS: Record<keyof AgentMiddleware, string> = {
+  hitl: "사람 승인",
+  modelCallLimit: "모델 호출 상한",
+  toolCallLimit: "도구 호출 상한",
+  summarization: "대화 요약",
+  retry: "재시도",
+  fallback: "대체 모델",
+  pii: "PII 마스킹",
+};
+
+function AgentMiddlewareSummary({ id }: { id: string }) {
+  const mw = usePlayground((s) => s.nodes.find((n) => n.id === id)?.data.middleware);
+  const on = Object.keys(mw ?? {}) as (keyof AgentMiddleware)[];
+  return (
+    <div className="rounded-xl border border-border p-2.5">
+      <div className="mb-1.5 flex items-center gap-1.5 text-[12px] font-medium">
+        <Layers className="h-3.5 w-3.5 text-accent" /> 루프 · 미들웨어
+        <span className="ml-auto text-[11px] text-muted">{on.length ? `${on.length}개 켜짐` : "없음"}</span>
+      </div>
+      {on.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-1">
+          {on.map((k) => (
+            <span key={k} className="rounded-md bg-accent-soft px-1.5 py-0.5 text-[10.5px] text-accent">
+              {MIDDLEWARE_LABELS[k]}
+            </span>
+          ))}
+        </div>
+      )}
+      <button onClick={() => usePlaygroundUI.getState().setAgentDialog(id)} className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-accent-fg hover:brightness-110">
+        <Maximize2 className="h-3.5 w-3.5" /> 루프 · 미들웨어 설정 (더블클릭)
+      </button>
+      <p className="mt-1.5 text-[10.5px] leading-relaxed text-muted">승인, 호출 상한, 요약, 재시도, 대체 모델, PII 마스킹. 구조를 바꾸려면 그 창에서 그래프로 꺼낼 수 있습니다.</p>
     </div>
   );
 }

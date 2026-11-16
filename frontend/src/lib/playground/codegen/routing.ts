@@ -1,6 +1,6 @@
 // 라우팅 함수 모음 (routing.py).
 import type { Ctx } from "./context.ts";
-import { llmExpr, pascal, py, targetKey } from "./context.ts";
+import { llmExpr, pascal, py, targetKey, toolsBehind } from "./context.ts";
 
 export function routingFile(c: Ctx): string | null {
   const routers = c.g.nodes.filter((n) => n.kind === "router");
@@ -17,7 +17,7 @@ export function routingFile(c: Ctx): string | null {
     const lit = `Literal[${keys.map(py).join(", ")}]`;
     const strategy = r.data.strategy ?? "llm";
     if (strategy === "tools_condition") {
-      const toolsEdge = (c.out.get(r.id) ?? []).find((e) => c.byId.get(e.target)?.kind === "tools");
+      const toolsEdge = (c.out.get(r.id) ?? []).find((e) => toolsBehind(c, e.target)); // Tools 로 바로, 또는 승인 노드를 거쳐
       const other = (c.out.get(r.id) ?? []).find((e) => e !== toolsEdge);
       blocks.push(`def ${r.data.name}(state: State) -> ${lit}:
     """tools_condition: 마지막 AIMessage 에 tool_calls 가 있으면 도구 노드로, 없으면 다음 단계로."""
