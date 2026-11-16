@@ -10,7 +10,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from .runner import _safe_path, run_collect
+from .runner import _safe_path, check_files, run_collect
 
 RUFF = shutil.which("ruff", path=os.path.dirname(sys.executable)) or shutil.which("ruff") or "ruff"
 # 문법 오류, 정의되지 않은 이름, 잘못된 비교 등 "실행하면 터지는" 규칙만 엄격하게 본다.
@@ -18,6 +18,7 @@ SELECT = "E9,F63,F7,F82,F821,F811,F601,F632"
 
 
 async def lint(files: dict[str, str]) -> list[dict]:
+    check_files(files)
     workdir = Path(tempfile.mkdtemp(prefix="agentlab-lint-"))
     try:
         for rel, content in files.items():

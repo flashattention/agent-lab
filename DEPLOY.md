@@ -25,6 +25,7 @@ Google 로그인, 프로젝트 저장, 링크 공유는 Supabase를 씁니다. �
 
 1. <https://supabase.com>에서 프로젝트를 만듭니다(리전은 Seoul 권장).
 2. **SQL Editor**에 [`supabase/schema.sql`](supabase/schema.sql) 내용을 붙여 넣고 실행합니다. `projects` 테이블과 행 단위 보안 정책이 만들어집니다.
+   이미 실행한 적이 있어도 새 버전으로 한 번 더 실행합니다. 에이전트 프리셋을 저장하는 `agent_presets` 테이블이 추가되었습니다.
 3. **Project Settings → API**에서 두 값을 적어 둡니다.
    - Project URL (`https://xxxx.supabase.co`)
    - anon public key (브라우저에 노출되어도 되는 키입니다. `service_role` 키는 어디에도 넣지 않습니다.)
@@ -110,3 +111,9 @@ SUPABASE_URL=https://xxxx.supabase.co SUPABASE_ANON_KEY=<anon public key> \
 
 최소 인스턴스가 0이라 한동안 요청이 없으면 첫 실행에 5~15초가 더 걸립니다.
 항상 빠르게 응답해야 한다면 `--min-instances 1`로 바꿀 수 있지만, 상시 비용이 생깁니다(월 수만 원 수준).
+
+
+## 보안 · 운영 설정
+
+샌드박스 네트워크 허용 목록, 프록시 홉 수, 요청 크기 상한 같은 설정과 남은 인프라 과제(실행 서비스 분리, 분산 rate limit 등)는
+[`docs/PRODUCTION_READINESS.md`](docs/PRODUCTION_READINESS.md)에 정리되어 있습니다.

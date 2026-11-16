@@ -2,11 +2,12 @@
 
 import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { AlertTriangle, OctagonAlert } from "lucide-react";
-import { KINDS, TOOL_LIBRARY } from "@/lib/playground/catalog";
+import { AlertTriangle, Link2, Maximize2, OctagonAlert } from "lucide-react";
+import { KINDS, toolCatalog } from "@/lib/playground/catalog";
+import { summarize } from "@/lib/playground/subgraph";
 import { cn } from "@/lib/utils";
 import { Icon } from "@/components/ui/icon";
-import type { FlowNode } from "./store";
+import { usePlayground, type FlowNode } from "./store";
 
 export type NodeStatus = "ok" | "warn" | "error";
 
@@ -23,8 +24,9 @@ function SourceHandle({ id, label, left, color }: { id: string; label: string; l
   );
 }
 
-export const AgentNode = memo(function AgentNode({ data, selected }: NodeProps<FlowNode>) {
+export const AgentNode = memo(function AgentNode({ id, data, selected }: NodeProps<FlowNode>) {
   const info = KINDS[data.kind];
+  const catalog = toolCatalog(usePlayground((s) => s.settings));
   const status = (data as FlowNode["data"] & { __status?: NodeStatus }).__status ?? "ok";
   const color = info.color;
 
@@ -46,6 +48,8 @@ export const AgentNode = memo(function AgentNode({ data, selected }: NodeProps<F
     );
   }
 
+  if (data.kind === "subgraph") return <SubgraphNode id={id} data={data} selected={!!selected} status={status} />;
+
   const isRouting = data.kind === "router" || data.kind === "map";
   const detail =
     data.kind === "router"
@@ -56,7 +60,9 @@ export const AgentNode = memo(function AgentNode({ data, selected }: NodeProps<F
           ? `최대 ${data.maxIterations ?? 3}회`
           : data.kind === "retriever"
             ? `top-k = ${data.k ?? 3}`
-            : null;
+            : data.model
+              ? data.model
+              : null;
   const tools = data.kind === "tools" || data.kind === "agent" ? data.tools ?? [] : [];
 
   return (
@@ -94,7 +100,7 @@ export const AgentNode = memo(function AgentNode({ data, selected }: NodeProps<F
                   key={t}
                   className={cn(
                     "rounded-md px-1.5 py-0.5 font-mono text-[10px]",
-                    TOOL_LIBRARY[t]?.sensitive ? "bg-danger/10 text-danger" : "bg-surface-2 text-fg-2",
+                    catalog[t]?.sensitive ? "bg-danger/10 text-danger" : "bg-surface-2 text-fg-2",
                   )}
                 >
                   {t}
@@ -123,3 +129,78 @@ export const AgentNode = memo(function AgentNode({ data, selected }: NodeProps<F
     </div>
   );
 });
+
+/** Sub-agent: 카드가 겹쳐 쌓인 모양으로 "안에 그래프가 있다"는 것을 보여 준다. */
+function SubgraphNode({ id, data, selected, status }: { id: string; data: FlowNode["data"]; selected: boolean; status: NodeStatus }) {
+  const info = KINDS.subgraph;
+  const sum = summarize(data.graph);
+  const catalog = toolCatalog(usePlayground((s) => s.settings));
+  const color = info.color;
+  return (
+    <div className="relative w-[240px]">
+      {/* 뒤에 겹친 카드 */}
+      <div className="absolute inset-0 translate-x-2 translate-y-2 rounded-2xl border border-border bg-surface-2" />
+      <div className="absolute inset-0 translate-x-1 translate-y-1 rounded-2xl border border-border bg-surface" />
+      <div
+        className={cn(
+          "relative rounded-2xl border-2 bg-surface shadow-soft transition-[box-shadow,border-color]",
+          selected && "ring-2 ring-accent/50",
+          status === "error" && "pulse-danger !border-danger bg-danger-soft",
+          status === "warn" && "!border-warning",
+        )}
+        style={status === "ok" ? { borderColor: color } : undefined}
+      >
+        <Handle type="target" position={Position.Top} className={handleCls} />
+        <div className="flex items-center gap-2.5 px-3 pt-2.5 pb-2">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-white" style={{ background: color }}>
+            <Icon name={info.icon} className="h-4 w-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1 truncate text-[10px] font-semibold tracking-wide uppercase" style={{ color }}>
+              Sub-agent
+              <span className="rounded bg-surface-2 px-1 py-px text-[9px] font-medium tracking-normal text-muted normal-case">{data.io === "shared" ? "상태 공유" : "격리"}</span>
+              {data.memory === "persistent" && <span className="rounded bg-surface-2 px-1 py-px text-[9px] font-medium tracking-normal text-muted normal-case">메모리</span>}
+            </div>
+            <div className="truncate font-mono text-[13px] font-semibold text-fg">{data.name}</div>
+          </div>
+          {status === "error" && <OctagonAlert className="h-4 w-4 shrink-0 text-danger" />}
+          {status === "warn" && <AlertTriangle className="h-4 w-4 shrink-0 text-warning" />}
+        </div>
+        <div className="border-t border-border px-3 py-2">
+          {data.description && <div className="mb-1 line-clamp-2 text-[11px] leading-snug text-muted">{data.description}</div>}
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="font-mono text-[10.5px] text-fg-2">
+              노드 {sum.count}
+              {sum.nested ? ` · 서브 ${sum.nested}` : ""}
+            </span>
+            {sum.tools.slice(0, 2).map((t) => (
+              <span key={t} className={cn("rounded-md px-1.5 py-0.5 font-mono text-[10px]", catalog[t]?.sensitive ? "bg-danger/10 text-danger" : "bg-surface-2 text-fg-2")}>
+                {t}
+              </span>
+            ))}
+            {sum.tools.length > 2 && <span className="text-[10px] text-muted">+{sum.tools.length - 2}</span>}
+          </div>
+          <div className="mt-1.5 flex items-center gap-1">
+            {data.preset && (
+              <span className="flex min-w-0 items-center gap-1 truncate text-[10px] text-muted" title={`프리셋: ${data.preset.name}`}>
+                <Link2 className="h-3 w-3 shrink-0" /> <span className="truncate">{data.preset.name}</span>
+              </span>
+            )}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                usePlayground.getState().enter(id);
+              }}
+              className="nodrag ml-auto flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[10.5px] font-semibold hover:bg-surface-2"
+              style={{ color }}
+              title="내부 그래프 열기 (더블클릭)"
+            >
+              <Maximize2 className="h-3 w-3" /> 열기
+            </button>
+          </div>
+        </div>
+        <Handle type="source" position={Position.Bottom} className={handleCls} style={{ borderColor: color }} />
+      </div>
+    </div>
+  );
+}

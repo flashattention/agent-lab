@@ -1,4 +1,5 @@
-import type { NodeData, NodeKind } from "./types.ts";
+import type { CustomTool, GraphSettings, NodeData, NodeKind } from "./types.ts";
+import { defaultSubGraph } from "./subgraph.ts";
 
 export type KindInfo = {
   kind: NodeKind;
@@ -152,6 +153,16 @@ export const KINDS: Record<NodeKind, KindInfo> = {
     api: "Annotated[list, operator.add] 리듀서",
     defaults: () => ({ name: "aggregate", prompt: "아래 부분 결과들을 하나의 일관된 최종 답변으로 종합하세요." }),
   },
+  subgraph: {
+    kind: "subgraph",
+    label: "Sub-agent (Subgraph)",
+    category: "멀티 에이전트",
+    icon: "boxes",
+    color: "#7c3aed",
+    description: "안쪽에 자체 그래프를 가진 하위 에이전트. 더블클릭해 내부를 편집합니다. Supervisor 워커, Map 워커, 일반 단계 어디에나 쓸 수 있고 프리셋으로 저장해 재사용합니다.",
+    api: "StateGraph.compile() → add_node(subgraph)",
+    defaults: () => ({ name: "sub_agent", description: "하위 작업을 맡는 서브 에이전트", io: "isolated", memory: "inherit", graph: defaultSubGraph() }),
+  },
 };
 
 export const PALETTE_ORDER: NodeKind[] = [
@@ -166,6 +177,7 @@ export const PALETTE_ORDER: NodeKind[] = [
   "router",
   "evaluator",
   "supervisor",
+  "subgraph",
   "map",
   "reduce",
 ];
@@ -271,6 +283,36 @@ def get_current_time() -> str:
     return datetime.now().isoformat(timespec="seconds")`,
   },
 };
+
+/** 노드별 모델을 지정할 수 있는 종류 */
+export const MODEL_KINDS = new Set<NodeKind>(["llm", "agent", "supervisor", "evaluator", "router", "reduce"]);
+export const MODEL_SUGGESTIONS = ["openai:gpt-5", "openai:gpt-5-mini", "openai:gpt-5-nano", "openai:gpt-4.1", "openai:gpt-4.1-mini", "anthropic:claude-sonnet-5-5", "anthropic:claude-haiku-5-5", "google_genai:gemini-2.5-flash"];
+/** init_chat_model 공급자 → 필요한 패키지 */
+export const PROVIDER_PACKAGES: Record<string, string> = {
+  openai: "langchain-openai>=1.7",
+  anthropic: "langchain-anthropic>=1.0",
+  google_genai: "langchain-google-genai>=3.0",
+  ollama: "langchain-ollama>=1.0",
+  bedrock_converse: "langchain-aws>=1.0",
+  azure_openai: "langchain-openai>=1.7",
+};
+export const providerOf = (model?: string) => (model?.includes(":") ? model.split(":")[0] : "openai");
+
+export function customToolDef(t: CustomTool): ToolDef {
+  return { name: t.name, label: "커스텀", description: t.description, sensitive: t.sensitive, code: t.code.trim() };
+}
+
+/** 기본 도구 + 그래프에 정의된 커스텀 도구 */
+export function toolCatalog(settings?: Pick<GraphSettings, "customTools">): Record<string, ToolDef> {
+  const out: Record<string, ToolDef> = { ...TOOL_LIBRARY };
+  for (const t of settings?.customTools ?? []) if (t.name && !TOOL_LIBRARY[t.name]) out[t.name] = customToolDef(t);
+  return out;
+}
+
+export const CUSTOM_TOOL_TEMPLATE = (name: string) => `@tool
+def ${name}(query: str) -> str:
+    """이 도구가 하는 일을 구체적으로 적으세요. LLM 은 이 설명을 보고 언제 쓸지 판단합니다."""
+    return f"{query} 에 대한 결과"`;
 
 export function defaultData(kind: NodeKind): NodeData {
   return { name: kind, ...KINDS[kind].defaults() } as NodeData;

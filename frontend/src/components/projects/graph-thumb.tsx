@@ -1,8 +1,8 @@
 import { KINDS } from "@/lib/playground/catalog";
-import type { Graph } from "@/lib/playground/types";
+import type { SubGraph } from "@/lib/playground/types";
 
 /** 그래프를 작은 도식으로 그린다. 프로젝트 카드의 미리보기용. */
-export function GraphThumb({ graph, className }: { graph: Graph; className?: string }) {
+export function GraphThumb({ graph, className }: { graph: SubGraph; className?: string }) {
   const nodes = graph?.nodes ?? [];
   if (!nodes.length) return <div className={className} />;
   const size = (kind: string) => (kind === "start" || kind === "end" ? { w: 120, h: 44 } : { w: 220, h: 80 });

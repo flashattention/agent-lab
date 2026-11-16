@@ -5,7 +5,7 @@ AI 에이전트를 그려서 설계하는 작업 공간이자 학습 플랫폼�
 | 공간 | 내용 |
 | --- | --- |
 | **학습** `/learn` | 8개 모듈, 40여 개 강의로 구성됩니다. 왼쪽에는 이론, 오른쪽에는 Monaco IDE가 있어 코드를 실행하고, traceback을 클릭해 오류 위치로 이동하며, 자동 채점 과제를 풀 수 있습니다. 강의마다 퀴즈가 있습니다. |
-| **플레이그라운드** `/playground` | 노드를 드래그해 연결하면 LangGraph 프로젝트(파일 트리)가 실시간으로 생성됩니다. 구조 분석으로 오류는 빨강, 병목과 위험은 노랑으로 표시합니다. 패턴 12종을 제공하고, 실행, 검증, LLM 고도화와 결과 캐싱, ZIP 다운로드를 지원합니다. |
+| **플레이그라운드** `/playground` | 노드를 드래그해 연결하면 LangGraph 프로젝트(파일 트리)가 실시간으로 생성됩니다. 구조 분석으로 오류는 빨강, 병목과 위험은 노랑으로 표시합니다. 패턴 13종을 제공하고, 실행, 검증, LLM 고도화와 결과 캐싱, ZIP 다운로드를 지원합니다. **Sub-agent** 노드를 더블클릭해 내부 그래프를 편집하고(중첩 가능), 만든 에이전트를 **프리셋**으로 저장해 다른 그래프에서 Sub-agent 로 불러옵니다. 노드별 모델, 커스텀 도구, 복사/붙여넣기, ⌘K 노드 검색, `agentlab.json` 가져오기/내보내기를 지원합니다. |
 | **내 프로젝트** `/projects` | Google 로그인 후 프로젝트를 여러 개 만들고 자동 저장합니다. 공유 링크(`/playground?p=<id>`)를 받은 사람은 보기 전용으로 열고, 자기 작업 공간에 복제해 편집합니다. |
 | **Docs** `/docs` | LangChain, LangGraph, Vector DB, 통합 도구의 한국어 API 레퍼런스입니다. ⌘K로 검색할 수 있습니다. |
 
@@ -16,13 +16,17 @@ frontend/   Next.js 16 (App Router) · Tailwind 4 · React Flow · Monaco
   content/learn/<module>/<lesson>/   강의 (lesson.md, examples/, exercise.py, solution.py, quiz.json)
   content/docs/<category>/*.md       레퍼런스 문서
   src/lib/playground/                그래프 모델 · 구조 분석기 · 코드 생성기 · 패턴
-  src/lib/{supabase,auth,projects}.ts  로그인 · 프로젝트 저장/공유
-supabase/schema.sql                  projects 테이블과 행 단위 보안 정책
+  src/lib/playground/subgraph.ts     서브그래프 순회 · 묶기/펼치기
+  src/lib/{supabase,auth,projects,presets}.ts  로그인 · 프로젝트 저장/공유 · 에이전트 프리셋
+supabase/schema.sql                  projects · agent_presets 테이블과 행 단위 보안 정책
+docs/PRODUCTION_READINESS.md         현업 사용을 위한 기능 · 보안 점검과 후속 과제
 backend/    FastAPI · uv · Python 3.13
   app/auth.py        로그인 확인(Supabase) · 사용자별 하루 한도
   app/runner.py      격리된 subprocess 실행 (타임아웃, rlimit, 출력 상한, 동시성 제한)
   app/validate.py    ruff 정적 검사와 Mock 모드 실제 실행 검증
+  app/policy.py      고도화 코드 보안 정책 (AST 허용 목록) — 통과해야 공유 캐시에 저장
   app/refine.py      고성능 LLM 고도화 → 검증 통과 시 그래프 구조 해시로 SQLite 캐시
+  sandbox/agentlab_guard.py  샌드박스 보안 정책 (audit hook: 네트워크 허용 목록, 외부 프로그램 실행 차단)
   sandbox/           API Key가 없을 때 쓰는 Mock LLM (tool calling, 구조화 출력, 스트리밍 모사)
   scripts/check_content.py   모든 강의 코드를 실제로 실행해 검증
 ```

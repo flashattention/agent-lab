@@ -76,9 +76,13 @@ export function SettingsDialog() {
         {msg && <p className={`mt-1.5 text-xs ${status === "error" ? "text-danger" : "text-success"}`}>{msg}</p>}
         <p className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-muted">
           <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          키는 이 브라우저(localStorage)에만 저장되고, 코드 실행 요청 시에만 서버로 전달됩니다. 서버는 키를 저장하지 않습니다.
-          키가 없으면 모든 예제가 <b className="text-fg-2">Mock LLM 모드</b>로 실행됩니다(흐름 검증용 모의 응답).
+          {s.rememberKey ? "키는 이 브라우저(localStorage)에 저장됩니다." : "키는 이 탭에만 보관되고 탭을 닫으면 지워집니다."} 코드 실행 요청 시에만 서버로 전달되고, 서버는 키를 저장하지
+          않습니다. 실행 샌드박스는 OpenAI 외의 주소로 연결할 수 없습니다. 키가 없으면 모든 예제가 <b className="text-fg-2">Mock LLM 모드</b>로 실행됩니다(흐름 검증용 모의 응답).
         </p>
+        <label className="mt-2 flex items-center gap-2 text-xs text-fg-2">
+          <input type="checkbox" checked={s.rememberKey} onChange={(e) => s.set({ rememberKey: e.target.checked })} className="accent-[var(--accent)]" />
+          이 브라우저에 계속 기억 (공용 PC 에서는 끄세요)
+        </label>
 
         <div className="mt-5 grid grid-cols-2 gap-4">
           <div>

@@ -20,6 +20,8 @@ RUN mkdir -p $TIKTOKEN_CACHE_DIR && \
 
 COPY app ./app
 COPY sandbox ./sandbox
+# 샌드박스 보안 정책을 -I(격리 모드) 자식 파이썬에도 걸기 위한 .pth (AGENTLAB_SANDBOX=1 일 때만 동작)
+RUN /app/.venv/bin/python -c "import app.runner"
 
 # 비root 사용자로 실행. /data 만 쓰기 가능(캐시 DB), 코드 실행은 /tmp 아래 임시 디렉터리에서 이루어진다.
 RUN useradd --create-home --uid 10001 runner && mkdir -p /data && chown runner /data && chmod -R a-w /app /opt/tiktoken

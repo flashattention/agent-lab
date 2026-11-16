@@ -15,8 +15,14 @@ import {
 import { useTheme } from "next-themes";
 import {
   AlertTriangle,
+  Boxes,
   CheckCircle2,
+  ChevronRight,
+  CornerLeftUp,
+  Group,
+  Home,
   Download,
+  FileUp,
   Eraser,
   FileCode2,
   LayoutGrid,
@@ -27,17 +33,20 @@ import {
   Play,
   Redo2,
   RotateCcw,
+  Save,
   ShieldCheck,
   Sparkles,
   Square,
   Undo2,
   X,
 } from "lucide-react";
-import { analyze } from "@/lib/playground/analyze";
+import { analyze, highlightAt } from "@/lib/playground/analyze";
 import { generateProject, normalizeGraph } from "@/lib/playground/codegen";
 import { KINDS } from "@/lib/playground/catalog";
 import { PATTERNS } from "@/lib/playground/patterns";
-import type { NodeKind } from "@/lib/playground/types";
+import type { Issue, NodeKind } from "@/lib/playground/types";
+import { usePresets, type AgentPreset } from "@/lib/presets";
+import { allNodes } from "@/lib/playground/subgraph";
 import { lookupRefined, refineCode, validateCode, type ValidateReport } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
@@ -50,7 +59,11 @@ import { Explorer } from "./explorer";
 import { PatternsDialog } from "./patterns-dialog";
 import { ProjectBar } from "./project-bar";
 import { RightPanel } from "./right-panel";
-import { CANVAS_TAB, toGraph, usePlayground } from "./store";
+import { CANVAS_TAB, currentPath, toGraph, toSub, usePlayground } from "./store";
+import { PresetsDialog, SavePresetDialog } from "./presets-dialog";
+import { usePlaygroundUI } from "./ui-store";
+import { NodeSearch } from "./node-search";
+import { exportGraphJson, parseGraphJson } from "@/lib/playground/graph-file";
 import { useProjectSync } from "./use-project-sync";
 import { useAuth } from "@/lib/auth";
 import { SUPABASE_ENABLED } from "@/lib/supabase";
@@ -78,10 +91,12 @@ function Workspace() {
   const user = useAuth((x) => x.user);
   const needLogin = SUPABASE_ENABLED && !user; // 코드 실행·검증·고도화는 로그인한 사용자만
   const [showPatterns, setShowPatterns] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [bottomTab, setBottomTab] = useState<"problems" | "terminal">("problems");
   const [validation, setValidation] = useState<ValidateReport | null>(null);
   const [busy, setBusy] = useState<null | "validate" | "refine">(null);
-  const [notice, setNotice] = useState<{ kind: "ok" | "error" | "info" | "login"; text: string } | null>(null);
+  const notice = usePlaygroundUI((x) => x.notice);
+  const setNotice = usePlaygroundUI((x) => x.setNotice);
   const [markers, setMarkers] = useState<Record<string, EditorMarker[]>>({});
   const [reveal, setReveal] = useState<{ line: number; nonce: number } | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -98,7 +113,22 @@ function Workspace() {
     }
   }, [mounted, rf]);
 
-  const graph = useMemo(() => toGraph(s), [s.nodes, s.edges, s.settings]); // eslint-disable-line react-hooks/exhaustive-deps
+  const graph = useMemo(() => toGraph(s), [s.nodes, s.edges, s.settings, s.stack]); // eslint-disable-line react-hooks/exhaustive-deps
+  const path = useMemo(() => currentPath(s.stack), [s.stack]);
+  const inside = s.stack.length > 0;
+  const selectedReal = s.nodes.filter((n) => n.selected && n.data.kind !== "start" && n.data.kind !== "end");
+
+  // 프리셋 목록: 로그인 상태가 바뀌면 다시 불러온다
+  useEffect(() => {
+    usePresets.getState().load();
+  }, [user?.id]);
+
+  // 서브그래프에 들어가거나 나오면 화면을 맞춘다
+  useEffect(() => {
+    if (!mounted) return;
+    const t = setTimeout(() => rf.fitView({ padding: 0.25, duration: 250 }), 40);
+    return () => clearTimeout(t);
+  }, [path.join("/")]); // eslint-disable-line react-hooks/exhaustive-deps
   // 좌표 이동만으로는 코드/분석이 바뀌지 않도록 구조 시그니처를 따로 계산
   const signature = useMemo(() => JSON.stringify(normalizeGraph(graph)), [graph]);
   const structural = useMemo(() => JSON.parse(signature), [signature]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -129,7 +159,11 @@ function Workspace() {
     let alive = true;
     lookupRefined(JSON.parse(debouncedSig))
       .then((r) => {
-        if (alive && r.hit) usePlayground.getState().setRefined({ key: debouncedSig, files: r.hit.files, notes: r.hit.notes, model: r.hit.model, cached: true });
+        if (alive && r.hit) {
+          usePlayground.getState().setRefined({ key: debouncedSig, files: r.hit.files, notes: r.hit.notes, model: r.hit.model, cached: true });
+          if (!usePlayground.getState().useRefined)
+            usePlaygroundUI.getState().setNotice({ kind: "ok", text: "이 구조의 검증된 고도화 코드가 있습니다. 파일 탐색기의 '템플릿' 배지를 누르면 확인하고 전환할 수 있습니다." });
+        }
       })
       .catch(() => {});
     return () => {
@@ -138,10 +172,11 @@ function Workspace() {
   }, [debouncedSig]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ------------------------------------------------------------ 캔버스 표시용 노드/엣지 */
-  const statusOf = (id: string): NodeStatus => (analysis.errorNodes.has(id) ? "error" : analysis.warnNodes.has(id) ? "warn" : "ok");
+  const hl = useMemo(() => highlightAt(analysis, path), [analysis, path]);
+  const statusOf = (id: string): NodeStatus => (hl.errorNodes.has(id) ? "error" : hl.warnNodes.has(id) ? "warn" : "ok");
   const viewNodes = useMemo(
     () => s.nodes.map((n) => ({ ...n, data: { ...n.data, __status: statusOf(n.id) } })),
-    [s.nodes, analysis], // eslint-disable-line react-hooks/exhaustive-deps
+    [s.nodes, hl], // eslint-disable-line react-hooks/exhaustive-deps
   );
   const viewEdges: Edge[] = useMemo(
     () =>
@@ -161,8 +196,8 @@ function Workspace() {
               : src?.data.kind === "map"
                 ? "Send(…)"
                 : undefined;
-        const err = analysis.errorEdges.has(e.id);
-        const warn = analysis.warnEdges.has(e.id);
+        const err = hl.errorEdges.has(e.id);
+        const warn = hl.warnEdges.has(e.id);
         return {
           ...e,
           type: "smoothstep",
@@ -172,11 +207,12 @@ function Workspace() {
           markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16, color: err ? "var(--danger)" : "var(--border-strong)" },
         };
       }),
-    [s.edges, s.nodes, analysis],
+    [s.edges, s.nodes, hl],
   );
 
-  const addAt = useCallback(
-    (kind: NodeKind, pos?: { x: number; y: number }) => {
+  /** 캔버스 가운데에서 다른 노드와 겹치지 않는 자리 */
+  const freeSpot = useCallback(
+    (pos?: { x: number; y: number }) => {
       let position = pos;
       if (!position) {
         const r = canvasRef.current?.getBoundingClientRect();
@@ -186,11 +222,49 @@ function Workspace() {
         const taken = (q: { x: number; y: number }) => usePlayground.getState().nodes.some((n) => Math.abs(n.position.x - q.x) < 230 && Math.abs(n.position.y - q.y) < 100);
         for (let i = 0; i < 12 && taken(position); i++) position = { x: position.x + 250, y: position.y + (i % 3 === 2 ? 110 : 0) };
       }
-      s.addNode(kind, position);
+      return position;
+    },
+    [rf],
+  );
+  const addAt = useCallback(
+    (kind: NodeKind, pos?: { x: number; y: number }) => {
+      s.addNode(kind, freeSpot(pos));
       s.setActiveTab(CANVAS_TAB);
     },
-    [rf, s],
+    [s, freeSpot],
   );
+  const addPreset = useCallback(
+    (p: AgentPreset, pos?: { x: number; y: number }) => {
+      s.addSubgraph(
+        p.graph,
+        { name: p.node_name, description: p.description, preset: { id: p.id, name: p.name, updatedAt: p.updated_at || undefined }, io: "isolated", memory: "inherit" },
+        freeSpot(pos),
+      );
+      s.setActiveTab(CANVAS_TAB);
+      usePlaygroundUI.getState().setLibraryOpen(false);
+      setNotice({ kind: "ok", text: `'${p.name}' 을(를) Sub-agent 로 추가했습니다. 다른 노드와 연결하고, 더블클릭하면 내부를 고칠 수 있습니다.` });
+    },
+    [s, freeSpot, setNotice],
+  );
+
+  const group = () => {
+    const name = prompt("서브 에이전트 이름 (Python 식별자)", "sub_agent");
+    if (!name) return;
+    const err = s.groupSelected(name.trim().replace(/\W+/g, "_") || "sub_agent");
+    setNotice(err ? { kind: "error", text: err } : { kind: "ok", text: "선택한 노드를 Sub-agent 로 묶었습니다. 더블클릭하면 안을 볼 수 있습니다." });
+  };
+
+  /** 지금 보고 있는 레벨(최상위면 캔버스 전체)을 프리셋으로 저장 */
+  const saveLevelAsPreset = () => {
+    const top = s.stack[s.stack.length - 1];
+    const owner = top ? top.nodes.find((n) => n.id === top.nodeId) : undefined;
+    usePlaygroundUI.getState().openSave({
+      graph: toSub(s.nodes, s.edges),
+      name: owner?.data.preset?.name ?? owner?.data.name ?? (s.projectId ? s.projectName : "내 에이전트"),
+      node_name: owner?.data.name ?? "sub_agent",
+      description: owner?.data.description ?? "",
+    });
+  };
 
   // 프로젝트를 새로 열면 화면에 맞춘다
   useEffect(() => {
@@ -200,8 +274,23 @@ function Workspace() {
   /* ------------------------------------------------------------ 액션 */
   const askLogin = () => setNotice({ kind: "login", text: "코드 실행, 검증, 고도화는 로그인 후 사용할 수 있습니다." });
 
+  /** 공유받은 프로젝트에 남이 쓴 코드가 있으면, 내 API 키로 실행하기 전에 확인한다 (보안 S3) */
+  const confirmUntrusted = () => {
+    const st = usePlayground.getState();
+    if (!st.projectId || st.owned || !apiKey) return true;
+    const custom = allNodes(graph).filter((n) => n.kind === "function").map((n) => `Function 노드 '${n.data.name}'`);
+    if (graph.settings.customTools?.length) custom.push(`커스텀 도구 ${graph.settings.customTools.length}개`);
+    if (Object.keys(st.overrides).length) custom.push(`직접 수정한 파일 ${Object.keys(st.overrides).length}개`);
+    if (!custom.length) return true;
+    return confirm(
+      `이 프로젝트는 다른 사람이 만들었고, 직접 작성한 코드가 들어 있습니다:\n- ${custom.join("\n- ")}\n\n` +
+        "내 OpenAI API 키로 실행하면 이 코드가 키를 사용할 수 있습니다 (샌드박스는 OpenAI 외 주소로의 연결을 막습니다).\n코드를 확인했고 실행할까요?",
+    );
+  };
+
   const run = async () => {
     if (needLogin) return askLogin();
+    if (!confirmUntrusted()) return;
     setBottomTab("terminal");
     setMarkers({});
     const res = await runner.run(files, "main.py", { timeout: 90 });
@@ -251,10 +340,33 @@ function Workspace() {
     }
   };
 
+  const importInput = useRef<HTMLInputElement>(null);
+  const importFile = async (file: File) => {
+    try {
+      let text: string;
+      if (file.name.endsWith(".zip")) {
+        const JSZip = (await import("jszip")).default;
+        const zip = await JSZip.loadAsync(file);
+        const entry = Object.values(zip.files).find((f) => f.name.endsWith("agentlab.json"));
+        if (!entry) throw new Error("ZIP 안에 agentlab.json 이 없습니다.");
+        text = await entry.async("string");
+      } else text = await file.text();
+      const g = parseGraphJson(text);
+      if (graph.nodes.length && !confirm("현재 캔버스를 가져온 그래프로 바꿀까요? (실행 취소 가능)")) return;
+      s.importGraph(g);
+      setNotice({ kind: "ok", text: `'${file.name}' 그래프를 가져왔습니다.` });
+      setTimeout(() => rf.fitView({ padding: 0.2, duration: 300 }), 60);
+    } catch (e) {
+      setNotice({ kind: "error", text: `가져오기 실패: ${(e as Error).message}` });
+    }
+  };
+
   const download = async () => {
     const JSZip = (await import("jszip")).default;
     const zip = new JSZip();
     for (const [p, c] of Object.entries(files)) zip.file(`langgraph-agent/${p}`, c);
+    // 그래프 원본 명세: 저장소에 커밋해 리뷰/diff 하고, '가져오기'로 다시 열 수 있다
+    zip.file("langgraph-agent/agentlab.json", exportGraphJson(graph));
     const blob = await zip.generateAsync({ type: "blob" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -280,6 +392,19 @@ function Workspace() {
       const el = e.target as HTMLElement | null;
       const typing = !!el?.closest("input, textarea, select, [contenteditable=true], .monaco-editor");
       const k = e.key.toLowerCase();
+      const onCanvas = !typing && usePlayground.getState().activeTab === CANVAS_TAB && !usePlaygroundUI.getState().libraryOpen;
+      if (k === "k") {
+        e.preventDefault();
+        setSearchOpen(true);
+        return;
+      }
+      if (onCanvas && (k === "c" || k === "v" || k === "d") && !window.getSelection()?.toString()) {
+        e.preventDefault();
+        const st = usePlayground.getState();
+        const n = k === "c" ? st.copySelection() : k === "v" ? st.paste() : st.duplicate();
+        if (n) setNotice({ kind: "ok", text: k === "c" ? `노드 ${n}개를 복사했습니다. 다른 서브그래프나 프로젝트에서도 붙여넣을 수 있습니다.` : `노드 ${n}개를 ${k === "v" ? "붙여넣었습니다" : "복제했습니다"}.` });
+        return;
+      }
       if (k === "s") {
         e.preventDefault();
         sync.flush();
@@ -295,19 +420,33 @@ function Workspace() {
         usePlayground.getState().redo();
       }
     };
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.metaKey || e.ctrlKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el?.closest("input, textarea, select, [contenteditable=true], .monaco-editor, [role=dialog]")) return;
+      const st = usePlayground.getState();
+      if (usePlaygroundUI.getState().libraryOpen || usePlaygroundUI.getState().saveDraft) return;
+      if (st.stack.length && st.activeTab === CANVAS_TAB) st.exitTo(st.stack.length - 1);
+    };
+    window.addEventListener("keyup", onEsc);
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [sync.flush]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keyup", onEsc);
+    };
+  }, [sync.flush, setNotice]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const errors = analysis.issues.filter((i) => i.level === "error");
   const warnings = analysis.issues.filter((i) => i.level === "warning");
   const activeFile = s.activeTab !== CANVAS_TAB && files[s.activeTab] !== undefined ? s.activeTab : null;
 
-  const focusNodes = (ids?: string[]) => {
-    if (!ids?.length) return;
+  const focusIssue = (issue: Issue) => {
     s.setActiveTab(CANVAS_TAB);
-    s.select(ids[0]);
-    setTimeout(() => rf.fitView({ nodes: ids.map((id) => ({ id })), padding: 0.6, duration: 400, maxZoom: 1.2 }), 30);
+    if (issue.path) usePlayground.getState().navigate(issue.path);
+    const ids = issue.nodes;
+    if (!ids?.length) return;
+    usePlayground.getState().select(ids[0]);
+    setTimeout(() => rf.fitView({ nodes: ids.map((id) => ({ id })), padding: 0.6, duration: 400, maxZoom: 1.2 }), 60);
   };
 
   if (!mounted) return <div className="grid flex-1 place-items-center text-sm text-muted">플레이그라운드 로딩 중…</div>;
@@ -321,11 +460,21 @@ function Workspace() {
         <button onClick={() => setShowPatterns(true)} className="flex shrink-0 items-center gap-1.5 rounded-lg bg-accent-soft px-3 py-1.5 text-xs font-semibold text-accent hover:brightness-105">
           <Library className="h-3.5 w-3.5" /> 패턴 예시
         </button>
+        <button
+          onClick={() => usePlaygroundUI.getState().setLibraryOpen(true)}
+          className="flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-surface-2"
+          title="저장해 둔 에이전트를 Sub-agent 로 불러오기"
+        >
+          <Boxes className="h-3.5 w-3.5 text-accent" /> 프리셋
+        </button>
         <div className="mx-1 h-5 w-px shrink-0 bg-border" />
         <ToolButton icon={Undo2} label="실행 취소" title="실행 취소 (Ctrl/⌘+Z)" onClick={s.undo} disabled={!s.past.length} />
         <ToolButton icon={Redo2} label="다시 실행" title="다시 실행 (Ctrl/⌘+Shift+Z)" onClick={s.redo} disabled={!s.future.length} />
         <ToolButton icon={LayoutGrid} label="자동 정렬" onClick={() => { s.autoLayout(); setTimeout(() => rf.fitView({ padding: 0.2, duration: 300 }), 30); }} />
-        <ToolButton icon={Eraser} label="비우기" onClick={() => confirm("캔버스를 비울까요?") && s.clear()} />
+        <ToolButton icon={Eraser} label="비우기" onClick={() => confirm(inside ? "이 서브그래프 내부를 비울까요?" : "캔버스를 비울까요?") && s.clear()} />
+        <div className="mx-1 h-5 w-px shrink-0 bg-border" />
+        <ToolButton icon={Group} label="Sub-agent로 묶기" title="선택한 노드를 Sub-agent 하나로 묶기 (Shift+드래그로 여러 개 선택)" onClick={group} disabled={!selectedReal.length} />
+        <ToolButton icon={Save} label={inside ? "이 서브그래프 저장" : "에이전트로 저장"} title="지금 보고 있는 그래프를 프리셋으로 저장해 다른 그래프에서 Sub-agent 로 재사용" onClick={saveLevelAsPreset} disabled={!s.nodes.length} />
         <div
           className={cn(
             "ml-2 hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium md:flex",
@@ -336,7 +485,19 @@ function Workspace() {
           {errors.length ? `구조 오류 ${errors.length}` : warnings.length ? `경고 ${warnings.length}` : graph.nodes.length ? "구조 정상" : "비어 있음"}
         </div>
         <div className="ml-auto flex items-center gap-1.5">
-          <ToolButton icon={Download} label="ZIP" onClick={download} disabled={!graph.nodes.length} />
+          <ToolButton icon={FileUp} label="가져오기" title="agentlab.json 또는 내려받은 ZIP 에서 그래프 가져오기" onClick={() => importInput.current?.click()} />
+          <input
+            ref={importInput}
+            type="file"
+            accept=".json,.zip,application/json,application/zip"
+            hidden
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) importFile(f);
+              e.target.value = "";
+            }}
+          />
+          <ToolButton icon={Download} label="ZIP" title="생성 코드 + agentlab.json 내려받기" onClick={download} disabled={!graph.nodes.length} />
           <button
             onClick={validate}
             disabled={!!busy || !analysis.ok}
@@ -415,7 +576,7 @@ function Workspace() {
                   className={cn("flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold", s.useRefined ? "bg-accent-soft text-accent" : "bg-surface-2 text-muted")}
                   title="LLM 고도화 코드 ↔ 템플릿 코드 전환"
                 >
-                  <Sparkles className="h-3 w-3" /> {s.useRefined ? "고도화" : "템플릿"}
+                  <Sparkles className="h-3 w-3" /> {s.useRefined ? "고도화" : "템플릿 · 고도화 있음"}
                 </button>
               ) : (
                 <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[10px] text-muted">템플릿</span>
@@ -472,9 +633,15 @@ function Workspace() {
                     }}
                     onDrop={(e) => {
                       e.preventDefault();
+                      const p = rf.screenToFlowPosition({ x: e.clientX, y: e.clientY });
+                      const presetId = e.dataTransfer.getData("application/agentlab-preset");
+                      if (presetId) {
+                        const preset = usePresets.getState().find(presetId);
+                        if (preset) addPreset(preset, { x: p.x - 120, y: p.y - 30 });
+                        return;
+                      }
                       const kind = e.dataTransfer.getData("application/agentlab-node") as NodeKind;
                       if (!kind || !KINDS[kind]) return;
-                      const p = rf.screenToFlowPosition({ x: e.clientX, y: e.clientY });
                       addAt(kind, { x: p.x - 110, y: p.y - 30 });
                     }}
                   >
@@ -486,6 +653,10 @@ function Workspace() {
                       onEdgesChange={s.onEdgesChange}
                       onConnect={s.onConnect}
                       onNodeClick={(_, n) => s.select(n.id)}
+                      onNodeDoubleClick={(_, n) => {
+                        if (n.data.kind === "subgraph") s.enter(n.id);
+                      }}
+                      zoomOnDoubleClick={false}
                       onPaneClick={() => s.select(null)}
                       colorMode={resolvedTheme === "dark" ? "dark" : "light"}
                       fitView
@@ -498,6 +669,7 @@ function Workspace() {
                       <Controls showInteractive={false} />
                       <MiniMap pannable zoomable nodeColor={(n) => KINDS[(n.data as { kind: NodeKind }).kind]?.color ?? "#888"} maskColor="color-mix(in srgb, var(--bg) 70%, transparent)" />
                     </ReactFlow>
+                    <Breadcrumb />
                     {errors.length > 0 && (
                       <button
                         onClick={() => setBottomTab("problems")}
@@ -565,7 +737,7 @@ function Workspace() {
                       }}
                     />
                   ) : (
-                    <ProblemsPanel analysis={analysis} validation={validation} refinedNotes={refinedValid?.notes} onFocus={focusNodes} />
+                    <ProblemsPanel analysis={analysis} validation={validation} refinedNotes={refinedValid?.notes} onFocus={focusIssue} />
                   )}
                 </div>
               </div>
@@ -576,7 +748,7 @@ function Workspace() {
 
         {/* 오른쪽: 컴포넌트/속성 */}
         <SplitPanel defaultSize="20" minSize="14">
-          <RightPanel onAdd={(k) => addAt(k)} />
+          <RightPanel onAdd={(k) => addAt(k)} onAddPreset={(p) => addPreset(p)} />
         </SplitPanel>
       </SplitGroup>
 
@@ -590,8 +762,60 @@ function Workspace() {
           setTimeout(() => rf.fitView({ padding: 0.2, duration: 400 }), 60);
         }}
       />
+      <PresetsDialog onInsert={(p) => addPreset(p)} />
+      <SavePresetDialog />
+      <NodeSearch
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        graph={graph}
+        onPick={(path, id) => {
+          setSearchOpen(false);
+          s.setActiveTab(CANVAS_TAB);
+          usePlayground.getState().navigate(path);
+          usePlayground.getState().select(id);
+          setTimeout(() => rf.fitView({ nodes: [{ id }], padding: 0.8, duration: 350, maxZoom: 1.2 }), 80);
+        }}
+      />
       {/* structural 은 캐시 키 계산에 사용 — 디버깅 시 확인용 */}
       <span hidden data-structure={structural ? "1" : "0"} />
+    </div>
+  );
+}
+
+/** 캔버스 왼쪽 위: 지금 보고 있는 그래프의 위치 (agent › researcher › ...) */
+function Breadcrumb() {
+  const stack = usePlayground((s) => s.stack);
+  const exitTo = usePlayground((s) => s.exitTo);
+  const owner = stack.length ? stack[stack.length - 1].nodes.find((n) => n.id === stack[stack.length - 1].nodeId) : undefined;
+  return (
+    <div className="absolute top-3 left-3 z-10 flex max-w-[calc(100%-1.5rem)] flex-col gap-1.5">
+      <div className={cn("flex items-center gap-0.5 overflow-x-auto rounded-xl border bg-surface/95 px-1 py-1 text-xs shadow-soft backdrop-blur", stack.length ? "border-accent/40" : "border-border")}>
+        <button onClick={() => exitTo(0)} className={cn("flex shrink-0 items-center gap-1 rounded-lg px-2 py-1", stack.length ? "text-muted hover:bg-surface-2 hover:text-fg" : "font-semibold text-fg")}>
+          <Home className="h-3.5 w-3.5" /> agent
+        </button>
+        {stack.map((f, i) => (
+          <span key={f.nodeId} className="flex shrink-0 items-center">
+            <ChevronRight className="h-3 w-3 text-muted" />
+            <button
+              onClick={() => exitTo(i + 1)}
+              disabled={i === stack.length - 1}
+              className={cn("flex items-center gap-1 rounded-lg px-2 py-1 font-mono", i === stack.length - 1 ? "font-semibold text-accent" : "text-muted hover:bg-surface-2 hover:text-fg")}
+            >
+              <Boxes className="h-3.5 w-3.5" /> {f.name}
+            </button>
+          </span>
+        ))}
+        {stack.length > 0 && (
+          <button onClick={() => exitTo(stack.length - 1)} className="ml-1 flex shrink-0 items-center gap-1 rounded-lg border-l border-border px-2 py-1 text-muted hover:text-fg" title="상위 그래프로 (Esc)">
+            <CornerLeftUp className="h-3.5 w-3.5" /> 위로
+          </button>
+        )}
+      </div>
+      {owner && (
+        <div className="w-fit max-w-sm rounded-lg bg-accent-soft px-2.5 py-1 text-[11px] text-accent">
+          Sub-agent <b className="font-mono">{owner.data.name}</b> 내부 · {owner.data.io === "shared" ? "상태 공유" : "격리"} 모드 · 그래프 설정(체크포인터 등)은 최상위를 따릅니다
+        </div>
+      )}
     </div>
   );
 }
@@ -614,7 +838,7 @@ function ProblemsPanel({
   analysis: ReturnType<typeof analyze>;
   validation: ValidateReport | null;
   refinedNotes?: string;
-  onFocus: (ids?: string[]) => void;
+  onFocus: (issue: Issue) => void;
 }) {
   return (
     <div className="h-full overflow-y-auto bg-surface px-2 py-1.5 text-[12.5px]">
@@ -624,7 +848,7 @@ function ProblemsPanel({
         </div>
       )}
       {analysis.issues.map((i, k) => (
-        <button key={k} onClick={() => onFocus(i.nodes)} className="flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-surface-2">
+        <button key={k} onClick={() => onFocus(i)} className="flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-surface-2">
           {i.level === "error" ? (
             <OctagonAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-danger" />
           ) : i.level === "warning" ? (

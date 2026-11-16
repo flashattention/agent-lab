@@ -47,3 +47,41 @@ create policy "projects_update" on public.projects
 drop policy if exists "projects_delete" on public.projects;
 create policy "projects_delete" on public.projects
   for delete to authenticated using (owner = auth.uid());
+
+-- ---------------------------------------------------------------------------
+-- 에이전트 프리셋: 만들어 둔 에이전트를 저장해 두고 다른 그래프에서 Sub-agent 로 불러온다.
+create table if not exists public.agent_presets (
+  id          uuid primary key default gen_random_uuid(),
+  owner       uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  name        text not null check (char_length(name) between 1 and 80),
+  node_name   text not null default 'sub_agent' check (node_name ~ '^[a-z_][a-z0-9_]*$'),
+  description text not null default '' check (char_length(description) <= 500),
+  graph       jsonb not null,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  constraint agent_presets_size check (pg_column_size(graph) < 524288)
+);
+
+create index if not exists agent_presets_owner_updated on public.agent_presets (owner, updated_at desc);
+
+drop trigger if exists agent_presets_touch on public.agent_presets;
+create trigger agent_presets_touch before update on public.agent_presets
+for each row execute function public.touch_updated_at();
+
+alter table public.agent_presets enable row level security;
+
+drop policy if exists "agent_presets_select" on public.agent_presets;
+create policy "agent_presets_select" on public.agent_presets
+  for select to authenticated using (owner = auth.uid());
+
+drop policy if exists "agent_presets_insert" on public.agent_presets;
+create policy "agent_presets_insert" on public.agent_presets
+  for insert to authenticated with check (owner = auth.uid());
+
+drop policy if exists "agent_presets_update" on public.agent_presets;
+create policy "agent_presets_update" on public.agent_presets
+  for update to authenticated using (owner = auth.uid()) with check (owner = auth.uid());
+
+drop policy if exists "agent_presets_delete" on public.agent_presets;
+create policy "agent_presets_delete" on public.agent_presets
+  for delete to authenticated using (owner = auth.uid());

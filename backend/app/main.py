@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import time
 from collections import defaultdict, deque
@@ -11,7 +12,7 @@ from importlib.metadata import version
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from .auth import AUTH_REQUIRED, daily_limit, require_user
@@ -20,8 +21,25 @@ from .runner import RunError, stream_run
 from .validate import validate
 
 app = FastAPI(title="AgentLab API", version="1.0.0")
+log = logging.getLogger("agentlab")
 
 origins = [o.strip() for o in os.getenv("AGENTLAB_CORS_ORIGINS", "*").split(",") if o.strip()]
+if not AUTH_REQUIRED and "*" in origins:
+    log.warning(
+        "⚠️  로그인 없이(SUPABASE_* 미설정) 모든 출처(CORS *)에서 코드 실행을 허용합니다. "
+        "공개 배포라면 SUPABASE_URL/SUPABASE_ANON_KEY 와 AGENTLAB_CORS_ORIGINS 를 설정하세요."
+    )
+
+MAX_BODY = int(float(os.getenv("AGENTLAB_MAX_BODY_MB", 4)) * 1024 * 1024)
+
+
+@app.middleware("http")
+async def limit_body(request: Request, call_next):
+    """본문이 너무 큰 요청은 읽기 전에 거절한다 (Content-Length 기준)."""
+    length = request.headers.get("content-length")
+    if length and length.isdigit() and int(length) > MAX_BODY:
+        return JSONResponse({"detail": f"요청이 너무 큽니다 (최대 {MAX_BODY // 1024 // 1024}MB)."}, status_code=413)
+    return await call_next(request)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -37,13 +55,20 @@ LIMITS = {
     "validate": int(os.getenv("AGENTLAB_RATE_VALIDATE", 15)),
     "refine": int(os.getenv("AGENTLAB_RATE_REFINE", 6)),
     "lookup": int(os.getenv("AGENTLAB_RATE_LOOKUP", 120)),
+    "models": int(os.getenv("AGENTLAB_RATE_MODELS", 10)),
 }
+# 앞단 프록시 수. X-Forwarded-For 는 클라이언트가 위조할 수 있으므로, 신뢰하는 프록시가
+# 덧붙인 오른쪽 값만 쓴다. Cloud Run / 리버스 프록시 1개 → 1. 프록시 없이 직접 노출 → 0.
+TRUSTED_HOPS = int(os.getenv("AGENTLAB_TRUSTED_PROXY_HOPS", 1))
 _hits: dict[tuple[str, str], deque] = defaultdict(deque)
 
 
 def _client_ip(req: Request) -> str:
-    fwd = req.headers.get("x-forwarded-for")
-    return fwd.split(",")[0].strip() if fwd else (req.client.host if req.client else "?")
+    direct = req.client.host if req.client else "?"
+    fwd = [p.strip() for p in (req.headers.get("x-forwarded-for") or "").split(",") if p.strip()]
+    if TRUSTED_HOPS <= 0 or not fwd:
+        return direct
+    return fwd[-TRUSTED_HOPS] if len(fwd) >= TRUSTED_HOPS else fwd[0]
 
 
 def rate_limit(req: Request, bucket: str) -> None:
@@ -137,6 +162,8 @@ async def refine_route(req: Request, body: RefineRequest):
 async def refine_cached(req: Request, body: LookupRequest):
     """LLM 호출 없이 캐시만 조회한다 (그래프가 바뀔 때마다 호출됨)."""
     rate_limit(req, "lookup")
+    if len(json.dumps(body.graph)) > 1_000_000:
+        raise HTTPException(413, "그래프가 너무 큽니다.")
     key = structure_key(body.graph)
     hit = await asyncio.to_thread(cache_get, key)
     return {"key": key, "hit": hit}
@@ -145,6 +172,7 @@ async def refine_cached(req: Request, body: LookupRequest):
 @app.get("/api/models")
 async def models(req: Request):
     """사용자 키로 사용 가능한 OpenAI 채팅 모델 목록."""
+    rate_limit(req, "models")
     api_key = _key(req)
     if not api_key:
         return {"models": []}

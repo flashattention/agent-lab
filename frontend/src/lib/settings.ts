@@ -3,8 +3,18 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+const SESSION_KEY = "agentlab-key";
+const readSessionKey = () => {
+  try {
+    return typeof window === "undefined" ? "" : sessionStorage.getItem(SESSION_KEY) || "";
+  } catch {
+    return "";
+  }
+};
+
 export type Settings = {
   apiKey: string;
+  rememberKey: boolean; // false 면 키를 이 탭(sessionStorage)에만 두고, 탭을 닫으면 지운다
   model: string; // init_chat_model 형식: "openai:gpt-5-mini"
   refineModel: string; // 플레이그라운드 코드 고도화용 고성능 모델
   editorFontSize: number;
@@ -16,17 +26,32 @@ export type Settings = {
 export const useSettings = create<Settings>()(
   persist(
     (set) => ({
-      apiKey: "",
+      apiKey: readSessionKey(),
+      rememberKey: false,
       model: "openai:gpt-5-mini",
       refineModel: "gpt-5",
       editorFontSize: 13,
       open: false,
-      set: (patch) => set(patch),
+      set: (patch) => {
+        if (patch.apiKey !== undefined)
+          try {
+            if (patch.apiKey) sessionStorage.setItem(SESSION_KEY, patch.apiKey);
+            else sessionStorage.removeItem(SESSION_KEY);
+          } catch {}
+        set(patch);
+      },
       setOpen: (open) => set({ open }),
     }),
     {
       name: "agentlab-settings",
-      partialize: ({ apiKey, model, refineModel, editorFontSize }) => ({ apiKey, model, refineModel, editorFontSize }),
+      // 키는 "계속 기억"을 켠 경우에만 localStorage 에 남긴다 (XSS 시 노출 범위 축소)
+      partialize: ({ apiKey, rememberKey, model, refineModel, editorFontSize }) => ({ ...(rememberKey ? { apiKey } : {}), rememberKey, model, refineModel, editorFontSize }),
+      version: 1,
+      // 이전 버전에서 저장해 둔 키가 있으면 사용자가 잃지 않도록 "계속 기억"을 켠 상태로 옮긴다
+      migrate: (old, v) => {
+        const o = (old ?? {}) as Partial<Settings>;
+        return (v < 1 ? { ...o, rememberKey: !!o.apiKey } : o) as Settings;
+      },
     },
   ),
 );

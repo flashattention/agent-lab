@@ -5,6 +5,7 @@
 - 프로세스 그룹 단위 타임아웃 kill, 출력량 상한
 - Linux 에서는 rlimit(CPU/메모리/파일크기/프로세스 수) 적용
 - 전역 동시 실행 수 제한(세마포어)
+- audit hook 보안 정책(sandbox/agentlab_guard.py): 네트워크 허용 목록, 외부 프로그램 실행 차단
 컨테이너 수준 격리(non-root, read-only rootfs)는 Dockerfile 에서 담당한다.
 """
 
@@ -15,6 +16,7 @@ import os
 import shutil
 import signal
 import sys
+import sysconfig
 import tempfile
 import time
 from dataclasses import dataclass, field
@@ -25,14 +27,54 @@ SANDBOX_DIR = Path(__file__).resolve().parent.parent / "sandbox"
 MAX_OUTPUT = int(os.getenv("AGENTLAB_MAX_OUTPUT", 200_000))
 MAX_TIMEOUT = int(os.getenv("AGENTLAB_MAX_TIMEOUT", 90))
 MAX_CONCURRENCY = int(os.getenv("AGENTLAB_MAX_CONCURRENCY", 8))
-MAX_FILES = 64
+MAX_FILES = int(os.getenv("AGENTLAB_MAX_FILES", 256))  # 서브 에이전트마다 패키지가 생기므로 넉넉히
 MAX_FILE_BYTES = 200_000
+MAX_TOTAL_BYTES = int(os.getenv("AGENTLAB_MAX_TOTAL_BYTES", 2_000_000))
+# 실제 키로 실행할 때 접속을 허용할 호스트. Mock 모드에서는 외부 연결을 모두 막는다.
+EGRESS_ALLOW = os.getenv("AGENTLAB_EGRESS_ALLOW", "api.openai.com")
+GUARD = SANDBOX_DIR / "agentlab_guard.py"
 
 _semaphore = asyncio.Semaphore(MAX_CONCURRENCY)
 
 
 class RunError(ValueError):
     pass
+
+
+def check_files(files: dict[str, str], entry: str | None = None) -> None:
+    """디스크에 쓰기 전에 파일 수·크기를 검사한다 (실행·린트 공통)."""
+    if len(files) > MAX_FILES:
+        raise RunError(f"파일이 너무 많습니다 ({len(files)}개, 최대 {MAX_FILES}개).")
+    total = 0
+    for rel, content in files.items():
+        if not isinstance(content, str):
+            raise RunError(f"파일 내용이 문자열이 아닙니다: {rel}")
+        size = len(content.encode())
+        if size > MAX_FILE_BYTES:
+            raise RunError(f"파일 하나가 너무 큽니다: {rel} (200KB 제한).")
+        total += size
+        if len(rel) > 300 or "\x00" in rel:
+            raise RunError(f"잘못된 파일 경로: {rel[:60]}")
+    if total > MAX_TOTAL_BYTES:
+        raise RunError(f"파일 전체 크기가 너무 큽니다 ({total // 1000}KB, 최대 {MAX_TOTAL_BYTES // 1000}KB).")
+    if entry is not None and entry not in files:
+        raise RunError(f"엔트리 파일 {entry} 이(가) 없습니다.")
+
+
+def _install_guard_pth() -> None:
+    """샌드박스 파이썬이 -I(격리 모드)로 자식 파이썬을 띄워도 보안 정책이 걸리도록
+    site-packages 에 .pth 를 둔다. AGENTLAB_SANDBOX=1 일 때만 동작하므로 서버 프로세스에는 영향이 없다.
+    Docker 이미지에서는 빌드 단계에서 미리 만들어 두고(읽기 전용 FS), 로컬 개발에서는 여기서 만든다."""
+    try:
+        target = Path(sysconfig.get_paths()["purelib"]) / "agentlab_guard.pth"
+        line = f"import os; os.environ.get('AGENTLAB_SANDBOX') == '1' and __import__('runpy').run_path({str(GUARD)!r})\n"
+        if not target.exists() or target.read_text() != line:
+            target.write_text(line)
+    except OSError:
+        pass
+
+
+_install_guard_pth()
 
 
 @dataclass
@@ -82,12 +124,15 @@ def _build_env(workdir: Path, api_key: str | None, model: str | None) -> tuple[d
         "LANG": "C.UTF-8",
         "LANGSMITH_TRACING": "false",
         "LAB_MODEL": model or "openai:gpt-5-mini",
+        "AGENTLAB_SANDBOX": "1",
         # 실행마다 HOME/TMPDIR 이 바뀌므로 tiktoken 인코딩 캐시는 고정 경로를 쓴다
         "TIKTOKEN_CACHE_DIR": os.getenv("TIKTOKEN_CACHE_DIR", str(SANDBOX_DIR.parent / "data" / "tiktoken")),
     }
     if mock:
         env["AGENTLAB_MOCK"] = "1"
+        env["AGENTLAB_EGRESS_ALLOW"] = ""
     else:
+        env["AGENTLAB_EGRESS_ALLOW"] = EGRESS_ALLOW
         env["OPENAI_API_KEY"] = api_key  # type: ignore[assignment]
     return env, mock
 
@@ -102,12 +147,7 @@ async def stream_run(
     stdin: str | None = None,
 ) -> AsyncIterator[dict]:
     """실행 이벤트를 순서대로 yield 한다: start → stdout/stderr* → exit."""
-    if len(files) > MAX_FILES:
-        raise RunError("파일이 너무 많습니다.")
-    if any(len(c.encode()) > MAX_FILE_BYTES for c in files.values()):
-        raise RunError("파일 하나가 너무 큽니다 (200KB 제한).")
-    if entry not in files:
-        raise RunError(f"엔트리 파일 {entry} 이(가) 없습니다.")
+    check_files(files, entry)
     timeout = max(1, min(int(timeout), MAX_TIMEOUT))
 
     async with _semaphore:

@@ -1,5 +1,5 @@
 // 잘 설계된 에이전트 패턴 예시 모음 (플레이그라운드 갤러리)
-import type { GEdge, GNode, Graph, GraphSettings, NodeData, NodeKind } from "./types.ts";
+import type { GEdge, GNode, Graph, GraphSettings, NodeData, NodeKind, SubGraph } from "./types.ts";
 import { DEFAULT_SETTINGS } from "./types.ts";
 import { defaultData } from "./catalog.ts";
 
@@ -30,6 +30,12 @@ function build(nodes: NodeSpec[], edges: EdgeSpec[], settings: Partial<GraphSett
     sourceHandle: h ?? null,
   }));
   return { nodes: gnodes, edges: gedges, settings: { ...DEFAULT_SETTINGS, ...settings } };
+}
+
+/** 서브그래프(Sub-agent)의 안쪽 그래프 */
+function sub(nodes: NodeSpec[], edges: EdgeSpec[]): SubGraph {
+  const { nodes: n, edges: e } = build(nodes, edges);
+  return { nodes: n, edges: e };
 }
 
 export const PATTERNS: Pattern[] = [
@@ -261,6 +267,74 @@ export const PATTERNS: Pattern[] = [
         ["supervisor", "END"],
       ],
       { demoInput: "AI 에이전트 시장 규모를 조사하고 연 25% 성장 시 3년 후 규모를 계산해 보고서로 써줘" },
+    ),
+  },
+  {
+    id: "hierarchical-team",
+    title: "계층형 팀 (Sub-agent)",
+    summary: "Supervisor 가 리서치 팀·작성 팀 서브그래프에 위임. 각 팀은 자체 ReAct 루프/검토 루프를 가진 독립 그래프.",
+    category: "멀티 에이전트",
+    difficulty: "고급",
+    why: "워커 하나하나가 여러 단계로 이루어진 큰 시스템. 팀 단위로 나눠 만들고, 프리셋으로 저장해 다른 프로젝트에서 재사용할 때.",
+    graph: build(
+      [
+        ["start", "START"],
+        ["supervisor", "supervisor", { maxIterations: 4, prompt: "당신은 프로젝트 매니저입니다. 조사가 필요하면 research_team, 문서 작성은 writing_team 에 맡기고 끝나면 FINISH 를 고르세요." }],
+        [
+          "subgraph",
+          "research_team",
+          {
+            description: "웹 검색과 계산으로 사실과 수치를 조사",
+            graph: sub(
+              [
+                ["start", "START"],
+                ["llm", "researcher", { prompt: "당신은 리서처입니다. 도구로 사실과 수치를 모은 뒤 핵심만 요약해 보고하세요." }],
+                ["router", "need_tools", { strategy: "tools_condition" }],
+                ["tools", "research_tools", { tools: ["web_search", "calculator"] }],
+                ["end", "END"],
+              ],
+              [
+                ["START", "researcher"],
+                ["researcher", "need_tools"],
+                ["need_tools", "research_tools"],
+                ["need_tools", "END"],
+                ["research_tools", "researcher"],
+              ],
+            ),
+          },
+        ],
+        [
+          "subgraph",
+          "writing_team",
+          {
+            description: "조사 결과로 보고서를 쓰고 스스로 검토해 다듬음",
+            graph: sub(
+              [
+                ["start", "START"],
+                ["llm", "drafter", { prompt: "당신은 테크니컬 라이터입니다. 대화에 모인 정보로 짧은 보고서를 쓰세요. 피드백이 있으면 반영하세요." }],
+                ["evaluator", "review", { prompt: "보고서가 수치 근거를 포함하고 구조가 명확하면 pass", maxIterations: 2 }],
+                ["end", "END"],
+              ],
+              [
+                ["START", "drafter"],
+                ["drafter", "review"],
+                ["review", "END", "pass"],
+                ["review", "drafter", "retry"],
+              ],
+            ),
+          },
+        ],
+        ["end", "END"],
+      ],
+      [
+        ["START", "supervisor"],
+        ["supervisor", "research_team"],
+        ["supervisor", "writing_team"],
+        ["research_team", "supervisor"],
+        ["writing_team", "supervisor"],
+        ["supervisor", "END"],
+      ],
+      { demoInput: "AI 에이전트 시장 규모를 조사하고 연 25% 성장 시 3년 후 규모를 보고서로 정리해줘" },
     ),
   },
   {
